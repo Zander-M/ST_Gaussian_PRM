@@ -1,6 +1,7 @@
 """
-    Generate map with obstacles on it.
+    Map objects
 """
+
 import math
 
 class Obstacle:
@@ -45,4 +46,10 @@ class Obstacle:
 
 class Maps:
     def __init__(self, width, height, obs_density) -> None:
+        pass
+
+class Instance:
+    def __init__(self, map) -> None:
+        self.map = map
+        self.objects = []
         pass

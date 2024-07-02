@@ -5,3 +5,8 @@
 class InstanceGenerator:
     def __init__(self, map) -> None:
         self.map = map
+
+class MapGenerator:
+    def __init__(self, map) -> None:
+        self.map = map
+
