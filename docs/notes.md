@@ -15,3 +15,7 @@ The Gaussian map does not have
 The travese capacity corresponds to the max flow from the start distributions to goal distributions
 
 During transportation, several agents need to wait at certain nodes for other agents to finish first. 
+
+## Experiments
+
+We create environment with spherical obstacles.
