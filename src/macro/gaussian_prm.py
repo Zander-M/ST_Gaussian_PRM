@@ -2,40 +2,49 @@
     Gaussian PRM based on map info.
 """
 import numpy as np
+from scipy.stats import gaussian_kde
 
-class GaussianDist:
+class GaussianNode:
     """
-        2D Gaussian Distributions
+        Gaussian Node
     """
-    def __init__(self, mean, cov):
-        self.mean = mean
-        self.cov = cov 
+    def __init__(self) -> None:
+        pass
+
+    def get_capacity(self):
+        pass
+
+    def get_gaussian(self):
+        pass
     
-
-
-class GaussianMixtureModel:
-    """
-        Gaussian Mixture Model that represents the distribution of groups of 
-        agents on the map. Each GMM is represented with mean, covariance and 
-        weight coefficient, such that the weight coefficients sum up to 1.
-    """
-    def __init__(self) -> None:
-        self.gaussians = []
-        self.weights = []
-        self.n = len(self.gaussians)
-
 class GaussianPRM:
+    """
+        Gaussian PRM
+    """
     def __init__(self) -> None:
+        pass
+
+    def build_gaussian_prm(self):
+        """
+            Build Gaussian PRM
+        """
         pass
 
     def abstract_prm(self):
         """
-            Construct abstract PRM for path search and 
+            Construct abstract PRM for path search. Node locations are the center
+            of the Gaussian distributions.
         """
         pass
 
     def astar_search(self, start, goal):
+        """
+            A star search on abstract graph
+        """
         pass
 
-    def gmm_search(self):
+    def gmm_search(self, start, goal):
+        """
+            GMM search on Gaussian PRM
+        """
         pass
