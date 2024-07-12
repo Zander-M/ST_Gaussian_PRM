@@ -5,10 +5,6 @@ from scipy.stats import gaussian_kde
 from matplotlib import pyplot as plt
 import numpy as np
 
-from ortools.init.python import init
-from ortools.linear_solver import pywraplp
-from ortools.graph.python import max_flow
-
 def test_gaussian():
     """
         Test Gaussian KDE
@@ -35,69 +31,122 @@ def test_gaussian():
     plt.legend()
     plt.savefig("test.png")
 
-def test_ortools():
-    solver = pywraplp.Solver.CreateSolver("GLOP")
-    if not solver:
-        print("can't create solver.")
-        return
+def test_prm():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.spatial import KDTree
 
-    x_var = solver.NumVar(0, 1, 'x')
-    y_var = solver.NumVar(0, 2, 'y')
-    print("# of variables", solver.NumVariables())
+    class Node:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
 
-    infinity = solver.infinity()
-    constraint = solver.Constraint(-infinity, 2, "ct")
-    constraint.SetCoefficient(x_var, 1)
-    constraint.SetCoefficient(y_var, 1)
-    print("# of constraints", solver.NumConstraints())
+    def distance(node1, node2):
+        return np.sqrt((node1.x - node2.x)**2 + (node1.y - node2.y)**2)
 
-    objective = solver.Objective()
-    objective.SetCoefficient(x_var, 3)
-    objective.SetCoefficient(y_var, 1)
-    objective.SetMaximization()
+    def is_collision_free(node, obstacles, radius=1):
+        for ox, oy in obstacles:
+            if distance(node, Node(ox, oy)) <= radius:
+                return False
+        return True
 
-    print(f"Solving with {solver.SolverVersion()}")
-    result_status = solver.Solve()
-    print(f"Status: {result_status}")
-    if result_status != pywraplp.Solver.OPTIMAL:
-        print("The problem does not have an optimal solution!")
-        if result_status == pywraplp.Solver.FEASIBLE:
-            print("A potentially suboptimal solution was found")
-        else:
-            print("The solver could not solve the problem.")
-            return
+    def sample_free_space(bounds, obstacles, num_samples):
+        samples = []
+        min_x, max_x, min_y, max_y = bounds
+        while len(samples) < num_samples:
+            x = np.random.uniform(min_x, max_x)
+            y = np.random.uniform(min_y, max_y)
+            node = Node(x, y)
+            if is_collision_free(node, obstacles):
+                samples.append(node)
+        return samples
 
-    print("Solution:")
-    print("Objective value =", objective.Value())
-    print("x =", x_var.solution_value())
-    print("y =", y_var.solution_value())
+    def build_roadmap(samples, k=10):
+        roadmap = []
+        kd_tree = KDTree([(node.x, node.y) for node in samples])
+        for i, node in enumerate(samples):
+            distances, indices = kd_tree.query((node.x, node.y), k=k+1)
+            edges = [(i, idx) for idx, dist in zip(indices[1:], distances[1:]) if dist > 0]
+            roadmap.extend(edges)
+        return roadmap
 
-def test_max_flow():
-    smf = max_flow.SimpleMaxFlow()
+    def find_path(start, goal, roadmap, samples):
+        start_idx = len(samples)
+        goal_idx = len(samples) + 1
+        samples.extend([start, goal])
 
-    # Define three parallel arrays: start_nodes, end_nodes, and the capacities
-    # between each pair. For instance, the arc from node 0 to node 1 has a
-    # capacity of 20.
-    start_nodes = np.array([0, 0, 0, 1, 1, 2, 2, 3, 3])
-    end_nodes = np.array([1, 2, 3, 2, 4, 3, 4, 2, 4])
-    capacities = np.array([20, 30, 10, 40, 30, 10, 20, 5, 20])
-    all_arcs = smf.add_arcs_with_capacity(start_nodes, end_nodes, capacities)
-    status =smf.solve(0, 4)
+        kd_tree = KDTree([(node.x, node.y) for node in samples])
+        roadmap.extend(build_roadmap([start, goal], k=10))
 
-    if status != smf.OPTIMAL:
-        print("There's an issue with the max flow")
-        exit(1)
-    print("Max flow:", smf.optimal_flow())
-    print("")
-    print(" Arc    Flow / Capacity")
-    solution_flows = smf.flows(all_arcs)
-    for arc, flow, capacity in zip(all_arcs, solution_flows, capacities):
-        print(f"{smf.tail(arc)} / {smf.head(arc)}   {flow:3}  / {capacity:3}")
-    print("Source side min-cut:", smf.get_source_side_min_cut())
-    print("Sink side min-cut:", smf.get_sink_side_min_cut())
+        graph = {i: [] for i in range(len(samples))}
+        for (i, j) in roadmap:
+            graph[i].append(j)
+            graph[j].append(i)
+
+        def dijkstra(graph, start, goal):
+            import heapq
+            queue = [(0, start)]
+            distances = {node: float('inf') for node in graph}
+            distances[start] = 0
+            predecessors = {node: None for node in graph}
+
+            while queue:
+                current_distance, current_node = heapq.heappop(queue)
+                if current_node == goal:
+                    break
+                for neighbor in graph[current_node]:
+                    distance = current_distance + distance(samples[current_node], samples[neighbor])
+                    if distance < distances[neighbor]:
+                        distances[neighbor] = distance
+                        predecessors[neighbor] = current_node
+                        heapq.heappush(queue, (distance, neighbor))
+
+            path = []
+            while goal is not None:
+                path.append(goal)
+                goal = predecessors[goal]
+            return path[::-1]
+
+        path_indices = dijkstra(graph, start_idx, goal_idx)
+        path = [samples[idx] for idx in path_indices]
+        return path
+
+    def plot_roadmap(roadmap, samples, obstacles, path=None):
+        fig, ax = plt.subplots()
+        for (i, j) in roadmap:
+            ax.plot([samples[i].x, samples[j].x], [samples[i].y, samples[j].y], 'gray', linestyle='-', linewidth=0.5)
+
+        for node in samples:
+            ax.plot(node.x, node.y, 'bo', markersize=2)
+
+        for ox, oy in obstacles:
+            ax.plot(ox, oy, 'ro', markersize=3)
+            ax.add_patch(plt.Circle((ox, oy), radius=1))
+
+
+        if path:
+            path_x = [node.x for node in path]
+            path_y = [node.y for node in path]
+            ax.plot(path_x, path_y, 'g-', linewidth=2)
+
+        ax.set_aspect('equal')
+        plt.show()
+
+    # Define problem
+    bounds = (0, 10, 0, 10)
+    obstacles = [(2, 2), (3, 5), (7, 8), (6, 4)]
+    num_samples = 100
+
+    # PRM algorithm
+    samples = sample_free_space(bounds, obstacles, num_samples)
+    roadmap = build_roadmap(samples)
+    start = Node(0, 0)
+    goal = Node(9, 9)
+    path = find_path(start, goal, roadmap, samples)
+
+    # Plot results
+    plot_roadmap(roadmap, samples, obstacles, path)
 
 if __name__ == "__main__":
     # test_gaussian()
-    # test_ortools()
-    test_max_flow()
-    pass
+    test_prm()
