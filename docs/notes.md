@@ -8,7 +8,7 @@ GMM does not constraint the number of agents in each distribution. We therefore 
 
 ## Discussion
 
-The Gaussian map does not have 
+The Gaussian map does not have a temporal dimension.
 
 ## Algorithm
 
@@ -18,4 +18,32 @@ During transportation, several agents need to wait at certain nodes for other ag
 
 ## Experiments
 
-We create environment with spherical obstacles.
+We create environment with spherical obstacles (?). 
+
+### Gaussian PRM 
+
+Consider the problem of constructing a Gaussian PRM. We consider the following 
+strategies. We sample points similar to a regular PRM 
+
+#### Univariate Gaussian
+
+We consider all the gaussian nodes has a spherical shape and the covariance matrix
+has the form: 
+
+[
+    sigma     0
+    0         sigma
+]
+
+The sigma value is computed by comparing the center of the point to the closest obstacle. Setting it as the isocontour of a certain probability density on the PDF, we compute the corresponding variance value. The capacity is computed based on the area of the circle.
+
+#### Gaussian Region with iterative refinement
+
+Refer to paper:
+https://arxiv.org/pdf/2403.02977
+https://groups.csail.mit.edu/robotics-center/public_papers/Deits14.pdf
+
+IRIS distro: https://github.com/rdeits/iris-distro
+
+Iteratively update an ellipsoid region until it collides with the environment.
+Construct the Gaussian 
