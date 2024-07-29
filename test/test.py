@@ -1,40 +1,35 @@
 """
     code tests
 """
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, multivariate_normal
+from scipy.spatial import KDTree
 from matplotlib import pyplot as plt
 import numpy as np
 
+from envs.loader import MapLoader
+from solvers.swarm_prm.macro.gaussian_prm import GaussianPRM
+
+
 def test_gaussian():
     """
-        Test Gaussian KDE
+        Test Gaussian KDE with visualization
     """
-    # Generate some random data
-    data = np.random.normal(0, 1, size=1000)
-
-    # Fit a Gaussian KDE to the data
-    kde = gaussian_kde(data)
-
     # Create a grid of points where we want to evaluate the KDE
-    x_grid = np.linspace(-5, 5, 1000)
+    x = np.linspace(0, 5, 100, endpoint=False)
+    y = np.linspace(0, 5, 100, endpoint=False)
+    xx, yy = np.meshgrid(x, y)
 
-    # Evaluate the KDE on the grid
-    kde_values = kde(x_grid)
-
+    z = multivariate_normal.pdf(np.dstack([xx, yy]), mean=[2.5, 2.5], cov=[2, 0.5])
+    print(z.shape)
+    
     # Plot the results
-    plt.figure(figsize=(8, 6))
-    plt.plot(x_grid, kde_values, label='Gaussian KDE')
-    plt.hist(data, bins=30, density=True, alpha=0.5, label='Histogram of data')
-    plt.title('Gaussian Kernel Density Estimate')
-    plt.xlabel('Value')
-    plt.ylabel('Density')
-    plt.legend()
+    ax = plt.figure(figsize=[8, 6]).add_subplot(projection='3d')
+    ax.plot_surface(xx, yy, z, edgecolor='royalblue', lw=0.5, rstride=8, cstride=8,
+                alpha=0.3)
     plt.savefig("test.png")
 
+
 def test_prm():
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from scipy.spatial import KDTree
 
     class Node:
         def __init__(self, x, y):
@@ -121,7 +116,7 @@ def test_prm():
 
         for ox, oy in obstacles:
             ax.plot(ox, oy, 'ro', markersize=3)
-            ax.add_patch(plt.Circle((ox, oy), radius=1))
+            ax.add_patch(plt.Circle((ox, oy), radius=1, color="blue"))
 
 
         if path:
@@ -130,7 +125,7 @@ def test_prm():
             ax.plot(path_x, path_y, 'g-', linewidth=2)
 
         ax.set_aspect('equal')
-        plt.show()
+        plt.savefig("test.png")
 
     # Define problem
     bounds = (0, 10, 0, 10)
@@ -147,6 +142,184 @@ def test_prm():
     # Plot results
     plot_roadmap(roadmap, samples, obstacles, path)
 
+def test_gaussian_prm():
+    fname = "../data/envs/map_3.yaml"
+    loader = MapLoader(fname)
+    loader.visualize("test_map")
+    map_instance = loader.get_map()
+    gaussian_prm = GaussianPRM(map_instance, 50)
+    gaussian_prm.roadmap_construction()
+    # gaussian_prm.visualize("test_gprm")
+
+
+def test_g_prm():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy.spatial import KDTree
+    from scipy.stats import multivariate_normal
+
+    class Node:
+        def __init__(self, mean, cov):
+            self.mean = np.array(mean)
+            self.cov = np.array(cov)
+        
+        def distance_to_node(self, other):
+            return np.linalg.norm(self.mean - other.mean)
+
+    def is_collision_free(node, obstacles, radius=0.5):
+        for ox, oy in obstacles:
+            if multivariate_normal.pdf([ox, oy], mean=node.mean, cov=node.cov) > 1e-3:
+                return False
+        return True
+
+    def distance_to_segment(px, py, ax, ay, bx, by):
+        """Calculate the distance from a point (px, py) to a line segment (ax, ay) - (bx, by)"""
+        if (ax == bx) and (ay == by):
+            return np.sqrt((px - ax)**2 + (py - ay)**2)
+    
+        t = ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax)**2 + (by - ay)**2)
+        t = max(0, min(1, t))
+        closest_x = ax + t * (bx - ax)
+        closest_y = ay + t * (by - ay)
+        return np.sqrt((px - closest_x)**2 + (py - closest_y)**2)
+
+    def is_edge_collision_free(node1, node2, obstacles, radius=0.5):
+        for ox, oy in obstacles:
+            if distance_to_segment(ox, oy, node1.mean[0], node1.mean[1], node2.mean[0], node2.mean[1]) <= radius:
+                return False
+        return True
+
+    def sample_free_space(bounds, obstacles, num_samples, cov_scale=0.1):
+        samples = []
+        min_x, max_x, min_y, max_y = bounds
+        while len(samples) < num_samples:
+            x = np.random.uniform(min_x, max_x)
+            y = np.random.uniform(min_y, max_y)
+            mean = [x, y]
+            cov = cov_scale * np.identity(2)
+            node = Node(mean, cov)
+            if is_collision_free(node, obstacles):
+                samples.append(node)
+        return samples
+
+    def build_roadmap(samples, obstacles, k=10, radius=0.5):
+        roadmap = []
+        kd_tree = KDTree([node.mean for node in samples])
+        for i, node in enumerate(samples):
+            distances, indices = kd_tree.query(node.mean, k=k+1)
+            for idx, dist in zip(indices[1:], distances[1:]):
+                if dist > 0 and is_edge_collision_free(node, samples[idx], obstacles, radius):
+                    roadmap.append((i, idx))
+        return roadmap
+
+    def find_path(start, goal, roadmap, samples, obstacles, k=10):
+        start_idx = len(samples)
+        goal_idx = len(samples) + 1
+        samples.extend([start, goal])
+    
+        # Build new roadmap connections for start and goal
+        kd_tree = KDTree([node.mean for node in samples])
+        new_roadmap = []
+        for idx, node in enumerate([start, goal]):
+            distances, indices = kd_tree.query(node.mean, k=k+1)
+            for i, dist in zip(indices[1:], distances[1:]):
+                if dist > 0 and is_edge_collision_free(node, samples[i], obstacles):
+                    new_roadmap.append((start_idx + idx, i))
+                    new_roadmap.append((i, start_idx + idx))
+    
+        roadmap.extend(new_roadmap)
+    
+        graph = {i: [] for i in range(len(samples))}
+        for (i, j) in roadmap:
+            graph[i].append(j)
+            graph[j].append(i)
+    
+        def dijkstra(graph, start, goal):
+            import heapq
+            queue = [(0, start)]
+            distances = {node: float('inf') for node in graph}
+            distances[start] = 0
+            predecessors = {node: None for node in graph}
+        
+            while queue:
+                current_distance, current_node = heapq.heappop(queue)
+                if current_node == goal:
+                    break
+                for neighbor in graph[current_node]:
+                    distance = current_distance + samples[current_node].distance_to_node(samples[neighbor])
+                    if distance < distances[neighbor]:
+                        distances[neighbor] = distance
+                        predecessors[neighbor] = current_node
+                        heapq.heappush(queue, (distance, neighbor))
+        
+            path = []
+            while goal is not None:
+                path.append(goal)
+                goal = predecessors[goal]
+            return path[::-1]
+    
+        path_indices = dijkstra(graph, start_idx, goal_idx)
+        path = [samples[idx] for idx in path_indices]
+        return path
+
+    def plot_roadmap(roadmap, samples, obstacles, path=None):
+        fig, ax = plt.subplots()
+        for (i, j) in roadmap:
+            ax.plot([samples[i].mean[0], samples[j].mean[0]], [samples[i].mean[1], samples[j].mean[1]], 'gray', linestyle='-', linewidth=0.5)
+    
+        for node in samples:
+            ax.plot(node.mean[0], node.mean[1], 'bo', markersize=2)
+    
+        for ox, oy in obstacles:
+            ax.plot(ox, oy, 'ro', markersize=3)
+            ax.add_patch(plt.Circle((ox, oy), radius=1, color="blue"))
+    
+        if path:
+            path_x = [node.mean[0] for node in path]
+            path_y = [node.mean[1] for node in path]
+            ax.plot(path_x, path_y, 'g-', linewidth=2)
+    
+        plt.savefig("test.png")
+
+    # Define problem
+    bounds = (0, 10, 0, 10)
+    obstacles = [(2, 2), (3, 5), (7, 8), (6, 4)]
+    num_samples = 100
+
+    # PRM algorithm
+    samples = sample_free_space(bounds, obstacles, num_samples)
+    roadmap = build_roadmap(samples, obstacles)
+    start = Node([0, 0], 0.1 * np.identity(2))
+    goal = Node([9, 9], 0.1 * np.identity(2))
+    path = find_path(start, goal, roadmap, samples, obstacles)
+
+    # Plot results
+    plot_roadmap(roadmap, samples, obstacles, path)
+
+def test_fsolve():
+    import numpy as np
+    from scipy.optimize import fsolve
+
+    # Given values
+    t = 2  # distance
+    p = 0.1  # probability density function value at distance t
+
+    # Function to solve for sigma^2
+    def equation(sigma2):
+        return p * 2 * np.pi * sigma2 - np.exp(-t**2 / (2 * sigma2))
+
+    # Initial guess for sigma^2
+    initial_guess = t**2 / 2
+
+    # Solve for sigma^2
+    sigma2_solution, = fsolve(equation, initial_guess)
+
+    # Covariance matrix
+    covariance_matrix = np.diag([sigma2_solution, sigma2_solution])
+
+    print("Sigma^2:", sigma2_solution)
+    print("Covariance Matrix:\n", covariance_matrix)
+
+    
 if __name__ == "__main__":
-    # test_gaussian()
-    test_prm()
+    test_gaussian_prm()

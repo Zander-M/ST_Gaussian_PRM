@@ -3,14 +3,8 @@
 """
 
 from abc import abstractmethod
-import math
-from collections import namedtuple
 
 import numpy as np
-
-# Name tuple for point
-
-Point = namedtuple('Point', ["x", "y"])
 
 ##### Map       #####
 
@@ -18,22 +12,67 @@ class Map:
     def __init__(self, width, height) -> None:
         self.width = width
         self.height = height
-        self.obstacles = []
+        self.obstacles:list[Obstacle] = []
 
+    def get_map_size(self):
+        """
+            Return map size
+        """
+        return np.array([self.width, self.height])
+    
     def add_obstacle(self, obstacle):
         """
             Add obstacles to the environment
         """
         self.obstacles.append(obstacle)
     
-    def collision_check(self, point):
+    def get_obstacles(self):
+        """
+            Return obstacles
+        """
+        return self.obstacles
+
+    def is_line_collision(self, line_start, line_end):
+        """
+            Check if a line collides with the environment
+        """
+
+        # boundary check
+
+        if line_start[0] < 0 or line_start[0] > self.width:
+            return True
+
+        if line_start[1] < 0 or line_start[1] > self.height:
+            return True
+
+        if line_end[0] < 0 or line_end[0] > self.width:
+            return True
+
+        if line_end[1] < 0 or line_end[1] > self.height:
+            return True
+
+        # obstacle check
+        for obs in self.obstacles:
+            if obs.is_line_colliding(line_start, line_end):
+                return True
+        return False
+
+    def is_point_collision(self, point):
         """
             Check if a point collides with the environment.
         """
-
         # Boundary Checks
+        if point[0] < 0 or point[0] > self.width:
+            return True
+
+        if point[1] < 0 or point[1] > self.height:
+            return True
 
         # Obstacle Checks
+        for obs in self.obstacles:
+            if obs.is_point_colliding(point):
+                return True
+        return False
 
 ##### Obstacles #####
 
@@ -53,16 +92,23 @@ class Obstacle:
         return self.pos
 
     @abstractmethod
-    def dist(self, point) -> float:
+    def get_dist(self, point) -> float:
         """
             check point to obstacle distance
         """
         pass
 
     @abstractmethod
-    def is_colliding(self, point) -> bool:
+    def is_point_colliding(self, point) -> bool:
         """
             check if point collides with obstacle 
+        """
+        pass
+
+    @abstractmethod
+    def is_line_colliding(self, line_start, line_end) -> bool:
+        """
+            check if line collides with obstacle 
         """
         pass
 
@@ -71,24 +117,48 @@ class CircleObstacle(Obstacle):
         Circular obstacle
     """
     def __init__(self, pos, radius):
-        super().__init__(pos, "Circle")
+        super().__init__(pos, "CIRCLE")
         self.radius = radius
 
-    def dist(self, point):
+    def get_dist(self, point):
         """
             distance to circle
         """
-        p_x, p_y = point
-        return math.sqrt((self.pos[0]-p_x)**2 + (self.pos[1]-p_y)**2) - self.radius
+        return np.linalg.norm(point-self.pos)-self.radius
+
+    def is_point_colliding(self, point) -> bool:
+        return self.get_dist(point) <= 0 
+
+    def is_line_colliding(self, line_start, line_end):
     
-    def is_colliding(self, point) -> bool:
-        return self.dist(point) <= 0
+        # Compute the line vector
+        line_vec = line_end - line_start
+        line_length = np.linalg.norm(line_vec)
+    
+        # Compute the vector from the start of the line to the point
+        point_vec = self.pos - line_start
+    
+        # Project point_vec onto line_vec to find the nearest point on the line
+        t = np.dot(point_vec, line_vec) / line_length**2
+    
+        # Restrict t to the range [0, 1] to stay within the line segment
+        t = max(0, min(1, t))
+    
+        # Find the nearest point on the line segment
+        nearest_point = line_start + t * line_vec
+    
+        # Compute the distance from the point to the nearest point on the line segment
+        distance = np.linalg.norm(self.pos - nearest_point)
+    
+        return distance <= self.radius
+
 
 class PolygonObstacle(Obstacle):
     """
         Polygonal obstacle.
         Vertices are relative to the absolute pos
         TODO: fix gjk
+        TODO: fix collision check
     """
     def __init__(self, pos, nums):
         super().__init__(pos, "Polygon")

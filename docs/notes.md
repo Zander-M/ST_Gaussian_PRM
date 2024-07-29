@@ -47,3 +47,21 @@ IRIS distro: https://github.com/rdeits/iris-distro
 
 Iteratively update an ellipsoid region until it collides with the environment.
 Construct the Gaussian 
+
+
+### Dev notes
+
+Assumptions:
+
+We assume there are multiple teams of agents on the map. At every timestep, each
+team of agents follow a Gaussian Mixture distribution on the map, with the center
+of the distributions matches a center of the Gaussian distribution on the map.
+All the distributions are synchronized, meaning that the agents must reach a static
+distribution before they transport to the next distribution.
+
+Population per node = Size of Team * coefficient for the corresponding Gaussian distribution.
+
+Optimization objective: makespan & traverse cost
+
+
+How to balance the distribution of agents through the map?

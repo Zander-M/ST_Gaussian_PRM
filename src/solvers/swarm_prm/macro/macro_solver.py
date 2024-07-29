@@ -4,6 +4,8 @@
     the max flow capacity of the PRM.
 """
 
+import ortools
+
 class GaussianPRMSearch:
     def __init__(self) -> None:
         pass
