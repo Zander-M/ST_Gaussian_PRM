@@ -25,14 +25,18 @@ We create environment with spherical obstacles (?).
 Consider the problem of constructing a Gaussian PRM. We consider the following 
 strategies. We sample points similar to a regular PRM 
 
+Gaussian Sampling Strategy
+
+https://www.cs.cmu.edu/~motionplanning/papers/sbp_papers/PRM/prmsampling_02.pdf
+
 #### Univariate Gaussian
 
 We consider all the gaussian nodes has a spherical shape and the covariance matrix
 has the form: 
 
 [
-    sigma     0
-    0         sigma
+    sigma^2     0
+    0         sigma^2
 ]
 
 The sigma value is computed by comparing the center of the point to the closest obstacle. Setting it as the isocontour of a certain probability density on the PDF, we compute the corresponding variance value. The capacity is computed based on the area of the circle.

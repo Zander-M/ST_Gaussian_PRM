@@ -5,7 +5,7 @@
 from matplotlib import pyplot as plt
 import yaml
 
-from envs.map_objects import *
+from swarm_prm.envs.map_objects import *
 
 
 class MapLoader:

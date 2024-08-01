@@ -3,7 +3,25 @@
 """
 
 import numpy as np
-from scipy.stats import multivariate_normal, wasserstein_distance_nd
+from scipy.stats import multivariate_normal, wasserstein_distance_nd, gaussian_kde
+
+class GaussianNode:
+    """
+        Gaussian Node
+    """
+    def __init__(self, pos, covariance, type="UNIFORM") -> None:
+        self.mean = pos 
+        self.type = type
+        self.covariance = covariance 
+
+    def get_pos(self):
+        """
+            Return the location of the point
+        """
+        return self.pos
+
+    def get_gaussian(self):
+        return self.mean, self.covariance
 
 class GaussianMixtureModel:
     """

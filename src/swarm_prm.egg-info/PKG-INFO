@@ -1,0 +1,55 @@
+Metadata-Version: 2.1
+Name: swarm_prm
+Version: 0.0.0
+Summary: Swarm PRM with spatio-temporal search
+Author-email: Zander Mao <zma40@sfu.ca>
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8.1
+Description-Content-Type: text/markdown
+Requires-Dist: requests
+Requires-Dist: importlib-metadata; python_version < "3.10"
+Provides-Extra: spark
+Requires-Dist: pyspark>=3.0.0; extra == "spark"
+Provides-Extra: test
+Requires-Dist: bandit[toml]==1.7.5; extra == "test"
+Requires-Dist: black==23.3.0; extra == "test"
+Requires-Dist: check-manifest==0.49; extra == "test"
+Requires-Dist: flake8-bugbear==23.5.9; extra == "test"
+Requires-Dist: flake8-docstrings; extra == "test"
+Requires-Dist: flake8-formatter_junit_xml; extra == "test"
+Requires-Dist: flake8; extra == "test"
+Requires-Dist: flake8-pyproject; extra == "test"
+Requires-Dist: pre-commit==3.3.1; extra == "test"
+Requires-Dist: pylint==2.17.4; extra == "test"
+Requires-Dist: pylint_junit; extra == "test"
+Requires-Dist: pytest-cov==4.0.0; extra == "test"
+Requires-Dist: pytest-mock<3.10.1; extra == "test"
+Requires-Dist: pytest-runner; extra == "test"
+Requires-Dist: pytest==7.3.1; extra == "test"
+Requires-Dist: pytest-github-actions-annotate-failures; extra == "test"
+Requires-Dist: shellcheck-py==0.9.0.2; extra == "test"
+
+# Swarm PRM 
+
+A python implementation for Swarm PRM with time dimension
+
+## Paper
+link to paper: https://arxiv.org/abs/2402.16699
+Extend Swarm PRM by adding space-time macro planning
+
+## Intuition
+
+if the next GMM in state does not have enough capacity, agent would need to split to smaller groups to guarantee traversability. Therefore some agents need to wait before some other agents.
+
+## Steps
+
+construct Gaussian Maps, with varying variance?
+
+* use this idea for diffusion?

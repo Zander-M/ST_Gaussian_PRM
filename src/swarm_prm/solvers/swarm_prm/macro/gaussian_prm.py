@@ -6,27 +6,23 @@ import ortools.graph.python
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.optimize import fsolve
-from scipy.stats import gaussian_kde
 from scipy.spatial import KDTree
 
-from envs.map_objects import Map
-from solvers.swarm_prm.macro.gaussian_mixture_model import GaussianMixtureModel
+from swarm_prm.envs.map_objects import Map
+from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture_model import GaussianNode, GaussianMixtureModel
 
-   
-class GaussianNode:
+class GaussianGraphNode(GaussianNode):
+
     """
         Gaussian Node
     """
-    def __init__(self, pos, radius, cvar= 0.99, type="UNIFORM") -> None:
-        self.type = type
+
+    def __init__(self, pos, radius, cvar=.99, type="UNIFORM") -> None:
+
+        super().__init__(pos, np.identity(2), type)
         self.radius = radius
         self.cvar = cvar
-        self.mean = pos 
-        self.covariance = np.identity(2)
         self.set_covariance()
-        print(self.radius, self.covariance)
-        
-
 
     def get_capacity(self):
         """
@@ -68,17 +64,35 @@ class GaussianNode:
         # Covariance matrix
         self.covariance = sigma2_solution
 
+class GaussianState:
+    """
+        Gaussian Mixture State
+    """
+    def __init__(self, gmm:GaussianMixtureModel, timestep):
+        self.gmm = gmm
+        self.timestep = timestep
+
+class GaussianInstance:
+    """
+        Gaussian instance for the macro problem, representing the start and goals
+        of the problem as gaussian mixtures.
+    """
+    def __init__(self, start:GaussianState, goal:GaussianState):
+        self.start = start
+        self.goal = goal
+
 class GaussianPRM:
     """
         Gaussian PRM
     """
 
-    def __init__(self, map:Map, num_samples) -> None:
+    def __init__(self, map:Map, instance:GaussianInstance, num_samples, sampling_strategy="UNIFORM") -> None:
         self.map = map
         self.num_samples = num_samples
         self.samples = []
         self.gaussian_nodes = []
         self.roadmap = []
+        self.sampling_strategy=sampling_strategy
 
     def roadmap_construction(self):
         """
@@ -98,20 +112,26 @@ class GaussianPRM:
             for obs in self.map.obstacles:
                 radius = min(radius, obs.get_dist(sample))
                 
-            self.gaussian_nodes.append(GaussianNode(sample, radius))
+            self.gaussian_nodes.append(GaussianGraphNode(sample, radius))
 
     def sample_free_space(self):
         """
             Sample points on the map uniformly random
             TODO: add Gaussian Sampling perhaps?
         """
-        min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
-        while len(self.samples) < self.num_samples:
-            x = np.random.uniform(min_x, max_x)
-            y = np.random.uniform(min_y, max_y)
-            node = np.array((x, y))
-            if not self.map.is_point_collision(node):
-                self.samples.append(node)
+        if self.sampling_strategy == "UNIFORM":
+            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            while len(self.samples) < self.num_samples:
+                x = np.random.uniform(min_x, max_x)
+                y = np.random.uniform(min_y, max_y)
+                node = np.array((x, y))
+                if not self.map.is_point_collision(node):
+                    self.samples.append(node)
+        elif self.sampling_strategy == "GAUSSIAN":
+
+            pass
+        else:
+            assert False, "Unimplemented sampling strategy"
 
     def build_roadmap(self, k=10):
         """
@@ -169,6 +189,8 @@ class GaussianPRM:
 
         ax.set_aspect('equal')
         plt.savefig("{}.png".format(fname), dpi=400)
+
+
 
 if __name__ == "__main__":
     pass
