@@ -1,0 +1,239 @@
+"""
+    Map objects
+"""
+
+from abc import abstractmethod
+
+import numpy as np
+
+##### Map       #####
+
+class Map:
+    def __init__(self, width, height) -> None:
+        self.width = width
+        self.height = height
+        self.obstacles:list[Obstacle] = []
+
+    def get_map_size(self):
+        """
+            Return map size
+        """
+        return np.array([self.width, self.height])
+    
+    def add_obstacle(self, obstacle):
+        """
+            Add obstacles to the environment
+        """
+        self.obstacles.append(obstacle)
+    
+    def get_obstacles(self):
+        """
+            Return obstacles
+        """
+        return self.obstacles
+
+    def is_line_collision(self, line_start, line_end):
+        """
+            Check if a line collides with the environment
+        """
+
+        # boundary check
+
+        if line_start[0] < 0 or line_start[0] > self.width:
+            return True
+
+        if line_start[1] < 0 or line_start[1] > self.height:
+            return True
+
+        if line_end[0] < 0 or line_end[0] > self.width:
+            return True
+
+        if line_end[1] < 0 or line_end[1] > self.height:
+            return True
+
+        # obstacle check
+        for obs in self.obstacles:
+            if obs.is_line_colliding(line_start, line_end):
+                return True
+        return False
+
+    def is_point_collision(self, point):
+        """
+            Check if a point collides with the environment.
+        """
+        # Boundary Checks
+        if point[0] < 0 or point[0] > self.width:
+            return True
+
+        if point[1] < 0 or point[1] > self.height:
+            return True
+
+        # Obstacle Checks
+        for obs in self.obstacles:
+            if obs.is_point_colliding(point):
+                return True
+        return False
+
+##### Obstacles #####
+
+class Obstacle:
+    """
+        Obstacles on the map
+    """
+
+    def __init__(self, pos, obs_type):
+        self.pos = pos
+        self.obs_type= obs_type 
+
+    def get_pos(self):
+        """
+            Return position
+        """
+        return self.pos
+
+    @abstractmethod
+    def get_dist(self, point) -> float:
+        """
+            check point to obstacle distance
+        """
+        pass
+
+    @abstractmethod
+    def is_point_colliding(self, point) -> bool:
+        """
+            check if point collides with obstacle 
+        """
+        pass
+
+    @abstractmethod
+    def is_line_colliding(self, line_start, line_end) -> bool:
+        """
+            check if line collides with obstacle 
+        """
+        pass
+
+class CircleObstacle(Obstacle):
+    """
+        Circular obstacle
+    """
+    def __init__(self, pos, radius):
+        super().__init__(pos, "CIRCLE")
+        self.radius = radius
+
+    def get_dist(self, point):
+        """
+            distance to circle
+        """
+        return np.linalg.norm(point-self.pos)-self.radius
+
+    def is_point_colliding(self, point) -> bool:
+        return self.get_dist(point) <= 0 
+
+    def is_line_colliding(self, line_start, line_end):
+    
+        # Compute the line vector
+        line_vec = line_end - line_start
+        line_length = np.linalg.norm(line_vec)
+    
+        # Compute the vector from the start of the line to the point
+        point_vec = self.pos - line_start
+    
+        # Project point_vec onto line_vec to find the nearest point on the line
+        t = np.dot(point_vec, line_vec) / line_length**2
+    
+        # Restrict t to the range [0, 1] to stay within the line segment
+        t = max(0, min(1, t))
+    
+        # Find the nearest point on the line segment
+        nearest_point = line_start + t * line_vec
+    
+        # Compute the distance from the point to the nearest point on the line segment
+        distance = np.linalg.norm(self.pos - nearest_point)
+    
+        return distance <= self.radius
+
+
+class PolygonObstacle(Obstacle):
+    """
+        Polygonal obstacle.
+        Vertices are relative to the absolute pos
+        TODO: fix gjk
+        TODO: fix collision check
+    """
+    def __init__(self, pos, nums):
+        super().__init__(pos, "Polygon")
+        self.polygon= []
+
+    def dist(self, point):
+        """
+            distance between a point and the polygon
+            computed with gjk algorithm 
+        """
+
+        def dot(v1, v2):
+            return np.dot(v1, v2)
+
+        def support(points, d):
+            """ 
+            Find the furthest point in the direction d from the origin in the set of points.
+            """
+            return max(points, key=lambda p: dot(p, d))
+
+        def perpendicular(v):
+            return np.array([-v[1], v[0]])
+
+        simplex = []
+        direction = point - self.polygon[0]  # Initial direction from the point to the first vertex of the polygon
+
+        while True:
+            # Get a new point in the direction
+            new_point = support(self.polygon, direction)
+    
+            # If the point we got is not past the origin in the direction, the distance is zero
+            if dot(new_point, direction) <= 0:
+                return 0
+
+            simplex.append(new_point)
+
+            if len(simplex) == 3:
+                # Get the edges of the triangle
+                a, b, c = simplex
+                ab = b - a
+                ac = c - a
+                ao = -a
+
+                # Perpendicular vectors to the edges
+                ab_perp = perpendicular(ab)
+                ac_perp = perpendicular(ac)
+
+                if dot(ab_perp, ao) > 0:
+                    simplex = [a, b]
+                    direction = ab_perp
+                else:
+                    simplex = [a, c]
+                    direction = ac_perp
+            else:
+                a, b = simplex
+                ab = b - a
+                ao = -a
+
+                direction = perpendicular(ab)
+                if dot(direction, ao) < 0:
+                    direction = -direction
+
+            if len(simplex) == 3:
+                break
+
+        # Calculate the distance from the point to the polygon
+        a, b, c = simplex
+        ab = b - a
+        ac = c - a
+        ao = -a
+
+        ab_perp = perpendicular(ab)
+        ac_perp = perpendicular(ac)
+
+        if dot(ab_perp, ao) > 0:
+            return np.linalg.norm(ab_perp)
+        else:
+            return np.linalg.norm(ac_perp)

@@ -3,7 +3,6 @@
 """
 
 import numpy as np
-from ortools.linear_solver import pywraplp
 from scipy.stats import multivariate_normal, wasserstein_distance_nd, gaussian_kde
 
 class GaussianNode:
@@ -62,7 +61,6 @@ class GaussianMixtureModel:
             Y. Chen, T. T. Georgiou, and A. Tannenbaum, “Optimal transport for
             gaussian mixture models,” IEEE Access, vol. 7, pp. 6269–6278, 2018
         """
-
         pass
 
 if __name__ == "__main__":

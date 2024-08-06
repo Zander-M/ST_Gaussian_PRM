@@ -128,7 +128,7 @@ class GaussianPRM:
                 if not self.map.is_point_collision(node):
                     self.samples.append(node)
         elif self.sampling_strategy == "GAUSSIAN":
-            assert False, "Unimplemented Gaussian sampling strategy"
+
             pass
         else:
             assert False, "Unimplemented sampling strategy"

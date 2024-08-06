@@ -1,6 +1,8 @@
 """
     code tests
 """
+
+import ortools
 from scipy.stats import gaussian_kde, multivariate_normal
 from scipy.spatial import KDTree
 from matplotlib import pyplot as plt
@@ -147,7 +149,7 @@ def test_gaussian_prm():
     loader = MapLoader(fname)
     loader.visualize("test_map")
     map_instance = loader.get_map()
-    gaussian_prm = GaussianPRM(map_instance, None, 50)
+    gaussian_prm = GaussianPRM(map_instance, None, 300)
     gaussian_prm.roadmap_construction()
     gaussian_prm.visualize("test_gprm")
 
@@ -320,6 +322,54 @@ def test_fsolve():
     print("Sigma^2:", sigma2_solution)
     print("Covariance Matrix:\n", covariance_matrix)
 
+from ortools.linear_solver import pywraplp
+
+
+def test_ortools():
+    """Linear programming sample."""
+    # Instantiate a Glop solver, naming it LinearExample.
+    solver = pywraplp.Solver.CreateSolver("GLOP")
+    if not solver:
+        return
+
+    # Create the two variables and let them take on any non-negative value.
+    x = solver.NumVar(0, solver.infinity(), "x")
+    y = solver.NumVar(0, solver.infinity(), "y")
+
+    print("Number of variables =", solver.NumVariables())
+
+    # Constraint 0: x + 2y <= 14.
+    solver.Add(x + 2 * y <= 14.0)
+
+    # Constraint 1: 3x - y >= 0.
+    solver.Add(3 * x - y >= 0.0)
+
+    # Constraint 2: x - y <= 2.
+    solver.Add(x - y <= 2.0)
+
+    print("Number of constraints =", solver.NumConstraints())
+
+    # Objective function: 3x + 4y.
+    solver.Maximize(3 * x + 4 * y)
+
+    # Solve the system.
+    print(f"Solving with {solver.SolverVersion()}")
+    status = solver.Solve()
+
+    if status == pywraplp.Solver.OPTIMAL:
+        print("Solution:")
+        print(f"Objective value = {solver.Objective().Value():0.1f}")
+        print(f"x = {x.solution_value():0.1f}")
+        print(f"y = {y.solution_value():0.1f}")
+    else:
+        print("The problem does not have an optimal solution.")
+
+    print("\nAdvanced usage:")
+    print(f"Problem solved in {solver.wall_time():d} milliseconds")
+    print(f"Problem solved in {solver.iterations():d} iterations")
+
+
     
 if __name__ == "__main__":
-    test_gaussian_prm()
+    # test_gaussian_prm()
+    test_ortools()

@@ -19,4 +19,3 @@ src/swarm_prm/solvers/swarm_prm/micro/__init__.py
 src/swarm_prm/solvers/swarm_prm/micro/solvers/__init__.py
 src/swarm_prm/solvers/swarm_prm/micro/solvers/apf.py
 test/test.py
-test/test_loader.py
