@@ -423,7 +423,7 @@ def test_wasserstein_distance():
     print("wasserstein distance:", wass_dist)
 
 if __name__ == "__main__":
-    # test_gaussian_prm()
+    test_gaussian_prm()
     # test_ortools()
-    # test_gmm_distance()
-    test_wasserstein_distance()
+    # test_gmm_distance(r)
+    # test_wasserstein_distance()

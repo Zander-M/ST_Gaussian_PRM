@@ -69,13 +69,15 @@ class GaussianMixtureModel:
         """
             Compute the Alternative Wasserstein Distance for two GMMs
             
-            $$
-                D(\rho1, \rho2) = 
-                \left\{\min_{\pi \in \Pi(\omega_1, \omega_2)}\sum_{i=1}^{N_1}\sum_{j=1}^{N_2}\left[W_2(g_1^i, g_2^j)\right]^2\pi(i, j)\right\}
-            $$
             Reference:
             Y. Chen, T. T. Georgiou, and A. Tannenbaum, “Optimal transport for
             gaussian mixture models,” IEEE Access, vol. 7, pp. 6269–6278, 2018
+        """
+        r"""
+        $$
+            D(\rho1, \rho2) = 
+            \left\{\min_{\pi \in \Pi(\omega_1, \omega_2)}\sum_{i=1}^{N_1}\sum_{j=1}^{N_2}\left[W_2(g_1^i, g_2^j)\right]^2\pi(i, j)\right\}
+        $$
         """
         
         # compute pairwise Wasserstein Distance

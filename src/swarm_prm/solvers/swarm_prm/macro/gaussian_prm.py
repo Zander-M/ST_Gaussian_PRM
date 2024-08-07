@@ -139,24 +139,29 @@ class GaussianPRM:
                 and covariance and check if the sample satisfies the CVaR condition
             """
             assert False, "Unimplemented Random sampling strategy"
+
+        elif self.sampling_strategy == "SPACE_TRIANGULATION":
+            """
+                Apply space triangulation and prune unsuitable points.
+            """
+            assert False, "Unimplemented space triangulation sampling strategy"
             pass
         else:
             assert False, "Unimplemented sampling strategy"
 
-    def build_roadmap(self, k=10):
+    def build_roadmap(self, r=15):
         """
-            Build Roadmap based on samples
+            Build Roadmap based on samples. Default connect radius is 10
         """
-
-        assert k < len(self.samples),"not enough samples for k = {}".format(k)
 
         kd_tree = KDTree([(sample[0], sample[1]) for sample in self.samples])
         for i, node in enumerate(self.samples):
-            distances, indices = kd_tree.query((node[0], node[1]), k=k+1)
+            indices = kd_tree.query_ball_point(node, r=r)
 
             # Edge must be collision free with the environment
-            edges = [(i, idx) for idx, dist in zip(indices[1:], distances[1:]) if dist > 0 \
-                     and not self.map.is_line_collision(self.samples[i], self.samples[idx])]
+            # TODO: update to check gaussian interpolation
+            edges = [(i, idx) for idx in indices \
+                     if not self.map.is_line_collision(self.samples[i], self.samples[idx])]
             self.roadmap.extend(edges)
 
     def get_abstract_prm(self):
@@ -198,6 +203,8 @@ class GaussianPRM:
             # ax.plot(path_x, path_y, 'g-', linewidth=2)
 
         ax.set_aspect('equal')
+        ax.set_xlim(left=0, right=self.map.width)
+        ax.set_ylim(bottom=0, top=self.map.height)
         plt.savefig("{}.png".format(fname), dpi=400)
 
 
