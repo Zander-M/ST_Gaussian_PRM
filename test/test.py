@@ -339,13 +339,14 @@ def test_ortools():
     print("Number of variables =", solver.NumVariables())
 
     # Constraint 0: x + 2y <= 14.
-    solver.Add(x + 2 * y <= 14.0)
+    # solver.Add(x + 2 * y <= 14.0)
 
     # Constraint 1: 3x - y >= 0.
-    solver.Add(3 * x - y >= 0.0)
+    # solver.Add(3 * x - y >= 0.0)
 
     # Constraint 2: x - y <= 2.
-    solver.Add(x - y <= 2.0)
+    # solver.Add(x - y <= 2.0)
+    solver.Add( x + y == 1)
 
     print("Number of constraints =", solver.NumConstraints())
 
@@ -368,8 +369,61 @@ def test_ortools():
     print(f"Problem solved in {solver.wall_time():d} milliseconds")
     print(f"Problem solved in {solver.iterations():d} iterations")
 
+def test_gmm_distance():
+    # Test with python optimal trasport lib
+    import numpy as np
+    import ot
 
+    # Mean and covariance matrix of the first 2D Gaussian distribution
+    mean1 = np.array([0, 0])
+    cov1 = np.array([[1, 0], [0, 1]])
+
+    # Mean and covariance matrix of the second 2D Gaussian distribution
+    mean2 = np.array([2, 2])
+    cov2 = np.array([[1, 0], [0, 1]])
+
+    # Compute the squared Wasserstein-2 distance
+    wasserstein_2_distance_squared = ot.gaussian_wasserstein_distance(mean1, cov1, mean2, cov2)
+
+    # Compute the Wasserstein-2 distance by taking the square root
+    wasserstein_2_distance = np.sqrt(wasserstein_2_distance_squared)
+    print("Wasserstein 2 distance", wasserstein_2_distance)
     
+def test_wasserstein_distance():
+    import numpy as np
+    from scipy.linalg import sqrtm
+
+    def wasserstein_2_distance(mean1, cov1, mean2, cov2):
+        # Calculate the squared difference between the means
+        mean_diff = np.linalg.norm(mean1 - mean2)**2
+
+        # Calculate the square root of the covariance matrices
+        cov1_sqrt = sqrtm(cov1)
+
+        # Calculate the trace term
+        cov_prod_sqrt = sqrtm(cov1_sqrt @ cov2 @ cov1_sqrt)
+        trace_term = np.trace(cov1 + cov2 - 2 * cov_prod_sqrt)
+
+        # Wasserstein-2 distance squared
+        wass_dist_squared = mean_diff + trace_term
+
+
+        return np.sqrt(wass_dist_squared)
+
+    # Mean and covariance matrix of the first 2D Gaussian distribution
+    mean1 = np.array([0, 0])
+    cov1 = np.array([[1, 0], [0, 1]])
+
+    # Mean and covariance matrix of the second 2D Gaussian distribution
+    mean2 = np.array([2, 2])
+    cov2 = np.array([[1, 0], [0, 1]])
+
+    # Compute the Wasserstein-2 distance
+    wass_dist = wasserstein_2_distance(mean1, cov1, mean2, cov2)
+    print("wasserstein distance:", wass_dist)
+
 if __name__ == "__main__":
     # test_gaussian_prm()
-    test_ortools()
+    # test_ortools()
+    # test_gmm_distance()
+    test_wasserstein_distance()

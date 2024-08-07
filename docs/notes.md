@@ -69,3 +69,5 @@ Optimization objective: makespan & traverse cost
 
 
 How to balance the distribution of agents through the map?
+
+Use Python Optimal Transport Lib for computing wasserstein distance

@@ -117,8 +117,10 @@ class GaussianPRM:
     def sample_free_space(self):
         """
             Sample points on the map uniformly random
+            TODO: add SwarmPRM sampling strategy
             TODO: add Gaussian Sampling perhaps?
         """
+
         if self.sampling_strategy == "UNIFORM":
             min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
             while len(self.samples) < self.num_samples:
@@ -129,6 +131,14 @@ class GaussianPRM:
                     self.samples.append(node)
         elif self.sampling_strategy == "GAUSSIAN":
             assert False, "Unimplemented Gaussian sampling strategy"
+            pass
+
+        elif self.sampling_strategy == "SWARMPRM":
+            """
+                Random sampling strategy as shown in SwarmPRM. Sample location 
+                and covariance and check if the sample satisfies the CVaR condition
+            """
+            assert False, "Unimplemented Random sampling strategy"
             pass
         else:
             assert False, "Unimplemented sampling strategy"

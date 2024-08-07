@@ -74,6 +74,22 @@ class Map:
                 return True
         return False
 
+    def in_free(self, gaussian, cvar, threshold):
+        """
+            TODO: implement in_free
+            Check if the gaussian distribution satisfies the CVaR safety constraint
+            using the signed distance function defined in SwarmPRM
+        """
+        pass
+    
+    def collision_free(self, guassian1, gaussian2, cvar, threshold, num_samples=10):
+        """
+            TODO: implement collision_free
+            Interpolate between two gaussian distributions to check if the CVaR
+            is respected along the path
+        """
+        pass
+
 ##### Obstacles #####
 
 class Obstacle:
