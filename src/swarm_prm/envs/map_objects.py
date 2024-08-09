@@ -6,6 +6,8 @@ from abc import abstractmethod
 
 import numpy as np
 
+from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode
+
 ##### Map       #####
 
 class Map:
@@ -74,6 +76,68 @@ class Map:
                 return True
         return False
 
+    def is_radius_collision(self, point, radius):
+        """
+            Check if a point is a least radius away from obstacles in the environment 
+        """
+        # Boundary Checks
+        if point[0] < radius or point[0] > self.width - radius:
+            return True
+
+        if point[1] < radius or point[1] > self.height - radius:
+            return True
+
+        # Obstacle Checks
+        for obs in self.obstacles:
+            if obs.is_radius_colliding(point, radius):
+                return True
+        return False
+
+    def is_gassian_trajectory_collision(self, start:GaussianNode, goal:GaussianNode,
+                                        num_samples=10, 
+                                        threshold=0.9, 
+                                        collision_check_method="MONTE_CARLO") -> bool:
+        """
+            Linearly interpolate between two Gaussian distributions and check if the trajectory
+            collides with the environment. Return True if it collides with the environment
+        """
+        mean1, cov1 = start.get_gaussian()
+        mean2, cov2 = goal.get_gaussian()
+        for step in range(num_samples):
+            mean = (step/num_samples)* mean1 + (1-(step/num_samples)) * mean2 
+            cov = (step/num_samples)* cov1 + (1-(step/num_samples)) * cov2 
+            g_node = GaussianNode(mean, cov)
+
+            if self.is_gaussian_collision(g_node, threshold=threshold, 
+                                          collsion_check_method=collision_check_method):
+                return True
+        return False
+        
+    def is_gaussian_collision(self, g_node:GaussianNode, 
+                              collision_check_method="MONTE_CARLO", 
+                              mc_num_samples=1000, mc_threshold=0.02,
+                              alpha=0.9, cvar_threshold=0.02) -> bool:
+        """
+            Perform collision checks of the distribution will collide
+            with the environment.  
+            MONTE-CARLO: using sampling to check if distribution collides with environment
+            CVAR: using closest point to obstacle to check if obstacle will collide
+        """
+        if collision_check_method == "MONTE_CARLO":
+            samples = g_node.get_samples(mc_num_samples)
+            count = 0
+            for sample in samples:
+                count += 1 if self.is_point_collision(sample) else 0
+            ratio = count / mc_num_samples
+            return ratio >= mc_threshold
+
+        elif collision_check_method == "CVAR":
+
+            for obs in self.obstacles:
+                if obs.is_gaussian_colliding(g_node, alpha, cvar_threshold):
+                    return True
+            return False
+
 ##### Obstacles #####
 
 class Obstacle:
@@ -96,21 +160,36 @@ class Obstacle:
         """
             check point to obstacle distance
         """
-        pass
+        assert False, "get_dist not implemented"
 
     @abstractmethod
     def is_point_colliding(self, point) -> bool:
         """
             check if point collides with obstacle 
         """
-        pass
+        assert False, "is_point_colliding not implemented"
 
     @abstractmethod
     def is_line_colliding(self, line_start, line_end) -> bool:
         """
             check if line collides with obstacle 
         """
-        pass
+        assert False, "is_line_colliding not implemented"
+
+    @abstractmethod
+    def is_radius_colliding(self, point, radius) -> bool:
+        """
+            check if obstacles is with the radius distance from the point
+        """
+        assert False, "is_radius_colliding not implemented"
+    
+    @abstractmethod
+    def is_gaussian_colliding(self, g_node:GaussianNode, cvar, threshold) -> bool:
+        """
+            check if Gaussian distribution is too close to the obstacles
+        """
+
+        assert False, "is_gaussian_colliding not implemented"
 
 class CircleObstacle(Obstacle):
     """
@@ -151,7 +230,17 @@ class CircleObstacle(Obstacle):
         distance = np.linalg.norm(self.pos - nearest_point)
     
         return distance <= self.radius
+    
+    def is_radius_colliding(self, point, radius) -> bool:
+        return self.get_dist(point) <= radius 
 
+    def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold) -> bool:
+        """
+            Using CVaR and threshold to test if node is too close to obstacle.
+            Reference: SwarmPRM
+        """
+        pass
+        
 
 class PolygonObstacle(Obstacle):
     """
@@ -237,3 +326,15 @@ class PolygonObstacle(Obstacle):
             return np.linalg.norm(ab_perp)
         else:
             return np.linalg.norm(ac_perp)
+
+    def is_line_colliding(self, line_start, line_end) -> bool:
+        return super().is_line_colliding(line_start, line_end)
+
+    def is_point_colliding(self, line_start, line_end) -> bool:
+        return super().is_line_colliding(line_start, line_end)
+
+    def is_radius_colliding(self, point, radius) -> bool:
+        return super().is_radius_colliding(point, radius)
+    
+    def is_gaussian_colliding(self, g_node: GaussianNode) -> bool:
+        return super().is_gaussian_colliding(g_node)

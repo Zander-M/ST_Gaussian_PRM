@@ -1,15 +1,13 @@
 """
     Gaussian PRM based on map info.
 """
-import ortools.graph.python
-
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.optimize import fsolve
 from scipy.spatial import KDTree
 
 from swarm_prm.envs.map_objects import Map
-from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture_model import GaussianNode, GaussianMixtureModel
+from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode, GaussianMixture
 
 class GaussianGraphNode(GaussianNode):
 
@@ -17,11 +15,11 @@ class GaussianGraphNode(GaussianNode):
         Gaussian Node
     """
 
-    def __init__(self, pos, radius, cvar=.99, type="UNIFORM") -> None:
+    def __init__(self, pos, radius, alpha=.99) -> None:
 
-        super().__init__(pos, np.identity(2), type)
+        super().__init__(pos, np.identity(2))
         self.radius = radius
-        self.cvar = cvar
+        self.alpha = alpha
         self.set_covariance()
 
     def get_capacity(self):
@@ -30,26 +28,34 @@ class GaussianGraphNode(GaussianNode):
         """
         return np.pi*self.radius*self.radius
 
-    def get_pos(self):
+    def get_mean(self):
         """
             Return the location of the point
         """
-        return self.pos
+        return self.mean
+
+    def get_radius(self):
+        """
+            Return the safe radius of the Gaussian Node
+        """
+        return self.radius
 
     def get_gaussian(self):
         return self.mean, self.covariance
 
-    def set_cvar(self, cvar):
-        self.cvar = cvar
+    def set_alpha(self, alpha):
+        self.alpha = alpha 
 
     def set_covariance(self):
         """
             Update covariance of the Gaussian node such that boundary matches
             the CVaR value. Use numerical method for solving covariance.
+
+            TODO: do we need this?
         """
         # Given values
         t = self.radius  # distance
-        p = self.cvar # probability density function value at distance t
+        p = self.alpha# probability density function value at distance t
 
         # Function to solve for sigma^2
         def equation(sigma2):
@@ -64,20 +70,20 @@ class GaussianGraphNode(GaussianNode):
         # Covariance matrix
         self.covariance = sigma2_solution
 
-class GaussianState:
+class GaussianMixtureState:
     """
         Gaussian Mixture State
     """
-    def __init__(self, gmm:GaussianMixtureModel, timestep):
+    def __init__(self, gmm:GaussianMixture, timestep):
         self.gmm = gmm
         self.timestep = timestep
 
-class GaussianInstance:
+class GaussianMixtureInstance:
     """
         Gaussian instance for the macro problem, representing the start and goals
         of the problem as gaussian mixtures.
     """
-    def __init__(self, start:GaussianState, goal:GaussianState):
+    def __init__(self, start:GaussianMixtureState, goal:GaussianMixtureState):
         self.start = start
         self.goal = goal
 
@@ -86,21 +92,43 @@ class GaussianPRM:
         Gaussian PRM
     """
 
-    def __init__(self, map:Map, instance:GaussianInstance, num_samples, sampling_strategy="UNIFORM") -> None:
+    def __init__(self, map:Map, instance:GaussianMixtureInstance, num_samples, 
+                 alpha=0.9, cvar_threshold=0.02,
+                 mc_threshold=0.02,
+                 sampling_strategy="UNIFORM", safety_radius=2) -> None:
+
+        # PARAMETERS
         self.map = map
+        self.instance = instance
         self.num_samples = num_samples
+        self.alpha = alpha
+        self.cvar_threshold = cvar_threshold
+        self.sampling_strategy = sampling_strategy
+        self.safety_radius = safety_radius
+
         self.samples = []
         self.gaussian_nodes = []
         self.roadmap = []
-        self.sampling_strategy=sampling_strategy
+        self.shortest_paths = []
 
+
+    def load_instance(self):
+        """
+            Load problem instance, adding start and target GMM nodes to the roadmap
+            TODO: implement this
+        """
+        pass
+        
     def roadmap_construction(self):
         """
             Build Gaussian PRM
         """
         self.sample_free_space() # sample node locations 
-        self.build_roadmap() # connect sample nodes, building roadmap
-        self.expand_nodes() # expand nodes to gaussian density functions
+        if self.sampling_strategy != "SWARMPRM":
+            # Swarm PRM sample Gaussian nodes so no need to covert to gaussian nodes
+            self.expand_nodes() # expand nodes to gaussian density functions
+        self.load_instance() # adding problem instance nodes to roadmap
+        self.build_roadmap() # connect sample Gaussian nodes, building roadmap
 
     def expand_nodes(self):
         """
@@ -129,6 +157,16 @@ class GaussianPRM:
                 node = np.array((x, y))
                 if not self.map.is_point_collision(node):
                     self.samples.append(node)
+
+        elif self.sampling_strategy == "UNIFORM_WITH_RADIUS":
+            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            while len(self.samples) < self.num_samples:
+                x = np.random.uniform(min_x, max_x)
+                y = np.random.uniform(min_y, max_y)
+                node = np.array((x, y))
+                if not self.map.is_radius_collision(node, self.safety_radius):
+                    self.samples.append(node)               
+
         elif self.sampling_strategy == "GAUSSIAN":
             assert False, "Unimplemented Gaussian sampling strategy"
             pass
@@ -149,7 +187,7 @@ class GaussianPRM:
         else:
             assert False, "Unimplemented sampling strategy"
 
-    def build_roadmap(self, r=15):
+    def build_roadmap(self, r=10):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
@@ -159,14 +197,14 @@ class GaussianPRM:
             indices = kd_tree.query_ball_point(node, r=r)
 
             # Edge must be collision free with the environment
-            # TODO: update to check gaussian interpolation
             edges = [(i, idx) for idx in indices \
-                     if not self.map.is_line_collision(self.samples[i], self.samples[idx])]
+                     if not self.map.is_gaussian_collision(self.gaussian_nodes[i], self.gaussian_nodes[idx])]
             self.roadmap.extend(edges)
 
-    def get_abstract_prm(self):
+    def get_csgraph(self):
         """
-            Return abstract PRM
+            Convert Roadmap to scipy csgraph for graph search algorithms
+            TODO: Implement this 
         """
         pass
 
@@ -176,13 +214,13 @@ class GaussianPRM:
         """
         pass
 
-    def gmm_search(self, start, goal):
+    def gmm_search(self):
         """
-            GMM search on Gaussian PRM
+            Use linear programming to find the weight assigned to different solution
+            paths.
         """
-        pass
 
-    def visualize(self, fname):
+    def visualize_map(self, fname):
         """
             Visualize Gaussian PRM
         """
@@ -190,8 +228,14 @@ class GaussianPRM:
         for (i, j) in self.roadmap:
             ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
 
-        for node in self.samples:
-            ax.plot(node[0], node[1], 'bo', markersize=2)
+        # for node in self.samples:
+            # ax.plot(node[0], node[1], 'bo', markersize=2)
+
+        for gaussian_node in self.gaussian_nodes:
+            pos = gaussian_node.get_mean()
+            ax.plot(pos[0], pos[1], 'bo', markersize=2)
+            # radius = gaussian_node.get_radius()
+            # ax.add_patch(plt.Circle(pos, radius=radius, color="cyan"))
 
         for obs in self.map.obstacles:
             ox, oy = obs.get_pos()
@@ -207,7 +251,11 @@ class GaussianPRM:
         ax.set_ylim(bottom=0, top=self.map.height)
         plt.savefig("{}.png".format(fname), dpi=400)
 
-
+    def visualize_solution(self):
+        """
+            Visualize solution paths
+        """
+        pass
 
 if __name__ == "__main__":
     pass

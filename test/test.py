@@ -145,13 +145,13 @@ def test_prm():
     plot_roadmap(roadmap, samples, obstacles, path)
 
 def test_gaussian_prm():
-    fname = "../data/envs/map_2.yaml"
+    fname = "../data/envs/map_6.yaml"
     loader = MapLoader(fname)
     loader.visualize("test_map")
     map_instance = loader.get_map()
-    gaussian_prm = GaussianPRM(map_instance, None, 300)
+    gaussian_prm = GaussianPRM(map_instance, None, 300, sampling_strategy="UNIFORM_WITH_RADIUS")
     gaussian_prm.roadmap_construction()
-    gaussian_prm.visualize("test_gprm")
+    gaussian_prm.visualize_map("test_gprm")
 
 
 def test_g_prm():

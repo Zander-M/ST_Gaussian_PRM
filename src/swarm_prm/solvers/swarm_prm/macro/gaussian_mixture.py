@@ -1,10 +1,9 @@
 """
-    Gaussian Mixture Model
+    Gaussian Mixture
 """
 
 import numpy as np
 from scipy.linalg import sqrtm
-from scipy.stats import multivariate_normal, wasserstein_distance_nd, gaussian_kde
 
 def gaussian_wasserstein_distance(mean1, cov1, mean2, cov2):
     """
@@ -32,9 +31,8 @@ class GaussianNode:
     """
         Gaussian Node
     """
-    def __init__(self, pos, covariance, type="UNIFORM") -> None:
-        self.mean = pos 
-        self.type = type
+    def __init__(self, mean, covariance) -> None:
+        self.mean = mean 
         self.covariance = covariance 
 
     def get_pos(self):
@@ -44,9 +42,19 @@ class GaussianNode:
         return self.pos
 
     def get_gaussian(self):
+        """
+            Return mean and covariance of the Gaussian node
+        """
         return self.mean, self.covariance
 
-class GaussianMixtureModel:
+    def get_samples(self, num_samples):
+        """
+            Get samples from the distribution.
+        """
+        return np.random.multivariate_normal(self.mean, self.cov, num_samples)
+        
+
+class GaussianMixture:
     """
         Gaussian Mixture Model that represents the distribution of groups of 
         agents on the map. Each GMM is represented with mean, covariance and 
@@ -86,11 +94,6 @@ class GaussianMixtureModel:
         for i, (mean1, cov1) in enumerate(gmm_1.get_gaussians()):
             for j, (mean2, cov2) in enumerate(gmm_2.get_gaussians()):
                 w_distance[i][j] = gaussian_wasserstein_distance(mean1, cov1, mean2, cov2)
-        
-        
-
-
-
 
 if __name__ == "__main__":
     pass
