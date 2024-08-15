@@ -35,11 +35,11 @@ class GaussianNode:
         self.mean = mean 
         self.covariance = covariance 
 
-    def get_pos(self):
+    def get_mean(self):
         """
             Return the location of the point
         """
-        return self.pos
+        return self.mean
 
     def get_gaussian(self):
         """
@@ -51,7 +51,9 @@ class GaussianNode:
         """
             Get samples from the distribution.
         """
-        return np.random.multivariate_normal(self.mean, self.cov, num_samples)
+        return np.random.multivariate_normal(self.mean, 
+                                             self.covariance, 
+                                             num_samples)
         
 
 class GaussianMixture:

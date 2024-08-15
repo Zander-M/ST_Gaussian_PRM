@@ -5,6 +5,7 @@
 from abc import abstractmethod
 
 import numpy as np
+from scipy.stats import norm
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode
 
@@ -115,7 +116,7 @@ class Map:
         
     def is_gaussian_collision(self, g_node:GaussianNode, 
                               collision_check_method="MONTE_CARLO", 
-                              mc_num_samples=1000, mc_threshold=0.02,
+                              mc_num_samples=100, mc_threshold=0.02,
                               alpha=0.9, cvar_threshold=0.02) -> bool:
         """
             Perform collision checks of the distribution will collide
@@ -237,10 +238,16 @@ class CircleObstacle(Obstacle):
     def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold) -> bool:
         """
             Using CVaR and threshold to test if node is too close to obstacle.
+            Return True if CVaR is greater than the threshold.
             Reference: SwarmPRM
         """
-        pass
-        
+
+        mean = -self.get_dist(g_node.get_mean())
+        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
+        variance = v_normal.T @ g_node.covariance @ v_normal
+        ita = norm(mean, variance)
+        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
+        return cvar > threshold
 
 class PolygonObstacle(Obstacle):
     """
