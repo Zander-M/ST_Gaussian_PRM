@@ -12,10 +12,10 @@ src/swarm_prm/envs/map_objects.py
 src/swarm_prm/solvers/__init__.py
 src/swarm_prm/solvers/swarm_prm/__init__.py
 src/swarm_prm/solvers/swarm_prm/macro/__init__.py
-src/swarm_prm/solvers/swarm_prm/macro/gaussian_mixture_model.py
+src/swarm_prm/solvers/swarm_prm/macro/gaussian_mixture.py
 src/swarm_prm/solvers/swarm_prm/macro/gaussian_prm.py
 src/swarm_prm/solvers/swarm_prm/macro/macro_solver.py
 src/swarm_prm/solvers/swarm_prm/micro/__init__.py
-src/swarm_prm/solvers/swarm_prm/micro/solvers/__init__.py
-src/swarm_prm/solvers/swarm_prm/micro/solvers/apf.py
+src/swarm_prm/solvers/swarm_prm/micro/apf.py
 test/test.py
+test/test_loader.py

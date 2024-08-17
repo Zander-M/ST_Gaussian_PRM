@@ -2,9 +2,10 @@
     Gaussian PRM based on map info.
 """
 from matplotlib import pyplot as plt
+from matplotlib.patches import Ellipse
 import numpy as np
-from scipy.optimize import fsolve
 from scipy.spatial import KDTree
+from scipy.stats import chi2
 
 from swarm_prm.envs.map_objects import Map
 from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode, GaussianMixture
@@ -58,24 +59,9 @@ class GaussianGraphNode(GaussianNode):
             Update covariance of the Gaussian node such that boundary matches
             the CVaR value. Use numerical method for solving covariance.
         """
-        # Given values
-        t = self.radius  # distance
-        p = self.alpha # probability density function value at distance t
-
-        # Function to solve for sigma^2
-        def equation(sigma2):
-            return p * 2 * np.pi * sigma2 - np.exp(-t**2 / (2 * sigma2))
-
-        # Initial guess for sigma^2
-        initial_guess = t**2 / 2
-
-        # Solve for sigma^2
-        sigma2_solution, = fsolve(equation, initial_guess)
-
-        # Covariance matrix
-        print(sigma2_solution.shape)
-        # self.covariance = sigma2_solution * np.identity((2, 2))
-
+        # compute covariance 
+        dist_square = chi2.ppf(self.alpha, 2)
+        self.covariance = self.radius ** 2 / dist_square * np.identity(2)
 
 class GaussianMixtureState:
     """
@@ -267,18 +253,27 @@ class GaussianPRM:
         # for node in self.samples:
             # ax.plot(node[0], node[1], 'bo', markersize=2)
 
-        all_samples = []
-        for gaussian_node in self.gaussian_nodes:
-            pos = gaussian_node.get_mean()
-            ax.plot(pos[0], pos[1], 'bo', markersize=2)
-            all_samples.append(gaussian_node.get_samples(50))
-
         # Visualize G nodes
         cmap = plt.get_cmap('tab10')
-        for i, samples in enumerate(all_samples):
-            ax.scatter(samples[:, 0], samples[:, 1], alpha=0.5, 
-                       color=cmap(i%10), s=[50]*len(samples))
+        for i, gaussian_node in enumerate(self.gaussian_nodes):
+            mean, cov = gaussian_node.get_gaussian()
+            # Compute the eigenvalues and eigenvectors of the covariance matrix
+            eigenvalues, eigenvectors = np.linalg.eigh(cov)
 
+            # Sort eigenvalues and eigenvectors by descending eigenvalue
+            order = eigenvalues.argsort()[::-1]
+            eigenvalues = eigenvalues[order]
+            eigenvectors = eigenvectors[:, order]
+
+            # The angle of the ellipse (in degrees)
+            angle = np.degrees(np.arctan2(*eigenvectors[:, 0][::-1]))
+
+            # The width and height of the ellipse (2*sqrt(chi2_value*eigenvalue))
+            chi2_value = chi2.ppf(0.99, 2)  # 95% confidence interval for 2 degrees of freedom (chi-squared value)
+            width, height = 2 * np.sqrt(chi2_value * eigenvalues)
+            ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle, 
+                              edgecolor=cmap(i%10), fc='None', lw=2)
+            ax.add_patch(ellipse)
 
         for obs in self.map.obstacles:
             ox, oy = obs.get_pos()

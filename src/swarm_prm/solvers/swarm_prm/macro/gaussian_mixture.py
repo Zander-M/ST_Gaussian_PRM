@@ -97,5 +97,7 @@ class GaussianMixture:
             for j, (mean2, cov2) in enumerate(gmm_2.get_gaussians()):
                 w_distance[i][j] = gaussian_wasserstein_distance(mean1, cov1, mean2, cov2)
 
+        # TODO: add optimization-based distance calculation
+
 if __name__ == "__main__":
     pass
