@@ -12,10 +12,11 @@ from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode
 ##### Map       #####
 
 class Map:
-    def __init__(self, width, height) -> None:
+    def __init__(self, width, height, map_name) -> None:
         self.width = width
         self.height = height
         self.obstacles:list[Obstacle] = []
+        self.map_name = map_name
 
     def get_map_size(self):
         """
@@ -29,6 +30,16 @@ class Map:
         """
         self.obstacles.append(obstacle)
     
+    def get_clear_radius(self, point):
+        """
+            Return clear radius from the selected point. Equivalent to the distance
+            to the closest obstacle
+        """
+        clear_radius = np.Infinity
+        for obs in self.obstacles:
+            clear_radius = min(clear_radius, obs.get_dist(point))
+        return clear_radius
+
     def get_obstacles(self):
         """
             Return obstacles

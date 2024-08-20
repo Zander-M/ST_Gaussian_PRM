@@ -26,7 +26,7 @@ class MapLoader:
         """
             Return Map
         """
-        return self.map_info
+        return self.map_info, self.fname
 
     def visualize(self, fname):
         """
