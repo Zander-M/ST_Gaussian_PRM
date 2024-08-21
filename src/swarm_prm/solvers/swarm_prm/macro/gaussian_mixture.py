@@ -58,7 +58,7 @@ class GaussianNode:
 
 class GaussianMixture:
     """
-        Gaussian Mixture Model that represents the distribution of groups of 
+        Gaussian Mixture that represents the distribution of groups of 
         agents on the map. Each GMM is represented with mean, covariance and 
         weight coefficient, such that the weight coefficients sum up to 1.
     """
@@ -96,8 +96,6 @@ class GaussianMixture:
         for i, (mean1, cov1) in enumerate(gmm_1.get_gaussians()):
             for j, (mean2, cov2) in enumerate(gmm_2.get_gaussians()):
                 w_distance[i][j] = gaussian_wasserstein_distance(mean1, cov1, mean2, cov2)
-
-        # TODO: add optimization-based distance calculation
 
 if __name__ == "__main__":
     pass

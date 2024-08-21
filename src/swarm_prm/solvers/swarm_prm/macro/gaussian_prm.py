@@ -77,7 +77,7 @@ class GaussianMixtureInstance:
         of the problem as gaussian mixtures.
     """
     def __init__(self, start:GaussianMixtureState, goal:GaussianMixtureState):
-        self.start = start
+        self.starts = start
         self.goal = goal
 
 class GaussianPRM:
@@ -133,7 +133,6 @@ class GaussianPRM:
     def sample_free_space(self):
         """
             Sample points on the map uniformly random
-            TODO: add SwarmPRM sampling strategy
             TODO: add Gaussian Sampling perhaps?
         """
 
