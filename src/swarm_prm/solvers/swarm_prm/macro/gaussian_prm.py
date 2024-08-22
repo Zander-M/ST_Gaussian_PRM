@@ -4,10 +4,11 @@
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
-from scipy.spatial import KDTree
+
+from scipy.spatial import KDTree, Delaunay
 from scipy.stats import chi2
 
-from swarm_prm.envs.map_objects import Map
+from swarm_prm.envs.roadmap import Roadmap
 from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode, GaussianMixture
 
 class GaussianGraphNode(GaussianNode):
@@ -85,12 +86,11 @@ class GaussianPRM:
         Gaussian PRM
     """
 
-    def __init__(self, map:Map, instance:GaussianMixtureInstance, num_samples, 
+    def __init__(self, map:Roadmap, instance:GaussianMixtureInstance, num_samples, 
                  alpha=0.9, cvar_threshold=-0.02,
                  mc_threshold=0.02,
-                 sampling_strategy="UNIFORM", safety_radius=2,
+                 safety_radius=2,
                  swarm_prm_covariance_scaling=5,
-                 gaussian_collision_checking_method="MONTE_CARLO"
                  ) -> None:
 
         # PARAMETERS
@@ -99,9 +99,7 @@ class GaussianPRM:
         self.num_samples = num_samples
         self.alpha = alpha
         self.cvar_threshold = cvar_threshold
-        self.sampling_strategy = sampling_strategy
         self.safety_radius = safety_radius
-        self.gaussian_collision_checking_method="MONTE_CARLO"
 
         # Monte Carlo Sampling strategy
         self.mc_threshold = mc_threshold
@@ -128,15 +126,15 @@ class GaussianPRM:
         """
         self.sample_free_space() # sample node locations 
         self.load_instance() # adding problem instance nodes to roadmap
-        self.build_roadmap() # connect sample Gaussian nodes, building roadmap
+        self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
 
-    def sample_free_space(self):
+    def sample_free_space(self, sampling_strategy="UNIFORM", collision_check_method="CVAR"):
         """
             Sample points on the map uniformly random
             TODO: add Gaussian Sampling perhaps?
         """
 
-        if self.sampling_strategy == "UNIFORM":
+        if sampling_strategy == "UNIFORM":
             min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
             while len(self.samples) < self.num_samples:
                 x = np.random.uniform(min_x, max_x)
@@ -150,7 +148,7 @@ class GaussianPRM:
                     self.samples.append(node)
                     self.gaussian_nodes.append(g_node)
 
-        elif self.sampling_strategy == "UNIFORM_WITH_RADIUS":
+        elif sampling_strategy == "UNIFORM_WITH_RADIUS":
             min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
             while len(self.samples) < self.num_samples:
                 x = np.random.uniform(min_x, max_x)
@@ -166,11 +164,7 @@ class GaussianPRM:
                     self.samples.append(node)               
                     self.gaussian_nodes.append(g_node)
 
-        elif self.sampling_strategy == "GAUSSIAN":
-            assert False, "Unimplemented Gaussian sampling strategy"
-            pass
-
-        elif self.sampling_strategy == "SWARMPRM":
+        elif sampling_strategy == "SWARMPRM":
             """
                 Random sampling strategy as shown in SwarmPRM. Sample location 
                 and covariance and check if the sample satisfies the CVaR condition
@@ -192,35 +186,46 @@ class GaussianPRM:
 
                 g_node = GaussianGraphNode(mean, cov, type="RANDOM")
                 if not self.map.is_gaussian_collision(g_node,
-                                                      collision_check_method=self.gaussian_collision_checking_method,
+                                                      collision_check_method=collision_check_method,
                                                       alpha=self.alpha, cvar_threshold=self.cvar_threshold
                                                       ):
                     self.samples.append(mean)
                     self.gaussian_nodes.append(g_node)
 
-
-        elif self.sampling_strategy == "SPACE_TRIANGULATION":
-            """
-                Apply space triangulation and prune unsuitable points.
-            """
-            assert False, "Unimplemented space triangulation sampling strategy"
-            pass
+        elif sampling_strategy == "GAUSSIAN":
+            assert False, "Unimplemented Gaussian sampling strategy"
         else:
             assert False, "Unimplemented sampling strategy"
 
-    def build_roadmap(self, r=10):
+    def build_roadmap(self, kd_radius=10, roadmap_method="KDTREE", collision_check_method="MONTE_CARLO"):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
 
-        kd_tree = KDTree([(sample[0], sample[1]) for sample in self.samples])
-        for i, node in enumerate(self.samples):
-            indices = kd_tree.query_ball_point(node, r=r)
+        if roadmap_method == "KDTREE":
+            kd_tree = KDTree([(sample[0], sample[1]) for sample in self.samples])
+            for i, node in enumerate(self.samples):
+                indices = kd_tree.query_ball_point(node, r=kd_radius)
 
-            # Edge must be collision free with the environment
-            edges = [(i, idx) for idx in indices \
-                     if not self.map.is_gaussian_collision(self.gaussian_nodes[i], self.gaussian_nodes[idx])]
-            self.roadmap.extend(edges)
+                # Edge must be collision free with the environment
+                edges = [(i, idx) for idx in indices \
+                         if not self.map.is_gaussian_trajectory_collision(
+                             self.gaussian_nodes[i],
+                             self.gaussian_nodes[idx],
+                             collision_check_method=collision_check_method)]
+                self.roadmap.extend(edges)
+
+        elif roadmap_method == "TRIANGULATION":
+            tri = Delaunay([(sample[0], sample[1]) for sample in self.samples])
+            for i, simplex in enumerate(tri.simplices):
+                for i in range(-1, 2):
+                    if (simplex[i], simplex[i+1]) not in self.roadmap \
+                        and (simplex[i+1], simplex[i]) not in self.roadmap \
+                        and self.map.is_gaussian_trajectory_collision(
+                             self.gaussian_nodes[i],
+                             self.gaussian_nodes[i+1],
+                             collision_check_method=collision_check_method):
+                        self.roadmap.append((simplex[i], simplex[i+1]))
 
     def get_csgraph(self):
         """
@@ -245,9 +250,34 @@ class GaussianPRM:
         """
             Visualize Gaussian PRM
         """
-        fig, ax = plt.subplots(figsize=(15, 15))
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Nodes and Paths 
+
+        for node in self.samples:
+            ax.plot(node[0], node[1], 'bo', markersize=2)
+
         for (i, j) in self.roadmap:
             ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
+
+        for obs in self.map.obstacles:
+            ox, oy = obs.get_pos()
+            ax.add_patch(plt.Circle((ox, oy), radius=obs.radius, color="black"))
+
+        ax.set_aspect('equal')
+        ax.set_xlim(left=0, right=self.map.width)
+        ax.set_ylim(bottom=0, top=self.map.height)
+        plt.savefig("{}.png".format(fname), dpi=400)
+        plt.show()
+    
+    def visualize_g_nodes(self, fname):
+        """
+            Visualize Gaussian Nodes on the map
+        """
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # for (i, j) in self.roadmap:
+            # ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
 
         # for node in self.samples:
             # ax.plot(node[0], node[1], 'bo', markersize=2)
@@ -285,7 +315,8 @@ class GaussianPRM:
 
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)
-        plt.savefig("{}.png".format(fname), dpi=800)
+        ax.set_ylim(bottom=0, top=self.map.height)
+        plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
     def visualize_solution(self):
