@@ -219,9 +219,10 @@ class GaussianPRM:
             tri = Delaunay([(sample[0], sample[1]) for sample in self.samples])
             for i, simplex in enumerate(tri.simplices):
                 for i in range(-1, 2):
+# 
                     if (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
-                        and self.map.is_gaussian_trajectory_collision(
+                        and not self.map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[i],
                              self.gaussian_nodes[i+1],
                              collision_check_method=collision_check_method):

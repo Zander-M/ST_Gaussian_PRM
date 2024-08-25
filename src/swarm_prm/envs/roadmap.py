@@ -129,7 +129,7 @@ class Roadmap:
         
     def is_gaussian_collision(self, g_node:GaussianNode, 
                               collision_check_method="MONTE_CARLO", 
-                              mc_num_samples=100, mc_threshold=0.99,
+                              mc_num_samples=100, mc_threshold=0.9,
                               alpha=0.9, cvar_threshold=-0.02) -> bool:
         """
             Perform collision checks of the distribution will collide
@@ -151,6 +151,21 @@ class Roadmap:
                 if obs.is_gaussian_colliding(g_node, alpha, cvar_threshold):
                     return True
             return False
+
+    def visualize(self):
+        """
+            Visualize map
+        """
+        fig, ax = plt.subplots()
+        ax.set_xlim([0, self.width])
+        ax.set_ylim([0, self.height])
+        for obs in self.get_obstacles():
+            x, y = obs.get_pos()
+            # ax.plot(x, y, 'ro', markersize=3)
+            ax.add_patch(plt.Circle((x, y), radius=obs.radius, color="gray"))
+        ax.set_aspect('equal')
+        plt.show()
+        return fig, ax
 
 ##### Obstacles #####
 
@@ -439,18 +454,5 @@ class RoadmapLoader:
         """
         return self.roadmap, self.fname
 
-    def visualize(self, fname):
-        """
-            Visualize instance
-        """
-        fig, ax = plt.subplots()
-        ax.set_xlim([0, self.roadmap.width])
-        ax.set_ylim([0, self.roadmap.height])
-        for obs in self.roadmap.get_obstacles():
-            x, y = obs.get_pos()
-            # ax.plot(x, y, 'ro', markersize=3)
-            ax.add_patch(plt.Circle((x, y), radius=obs.radius, color="gray"))
-        
-        ax.set_aspect('equal')
-        plt.savefig("{}.png".format(fname))
+
  

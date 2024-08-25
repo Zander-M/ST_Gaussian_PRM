@@ -19,6 +19,11 @@ class TEGNode():
         self.neighbors = neighbors
         self.timestep = timestep
 
+    def get_neighbors(self):
+        """
+            Return neighboring nodes with updated 
+        """
+
 class TEGGraph():
     """
         Time expanded graph
