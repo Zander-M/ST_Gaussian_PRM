@@ -8,7 +8,7 @@ from scipy.sparse.csgraph import maximum_flow
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_prm import GaussianPRM
 
-INF_FLOW = 1e9 # used as infinite flow edge capacity 
+INF = 1e9 # used as infinite flow edge capacity 
 
 class TEGNode():
     """
