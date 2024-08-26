@@ -1,5 +1,5 @@
 """
-    Map objects
+    Roadmap objects
 """
 
 from abc import abstractmethod
@@ -162,9 +162,8 @@ class Roadmap:
         for obs in self.get_obstacles():
             x, y = obs.get_pos()
             # ax.plot(x, y, 'ro', markersize=3)
-            ax.add_patch(plt.Circle((x, y), radius=obs.radius, color="gray"))
+            ax.add_patch(plt.Circle((x, y), radius=obs.radius, color="black"))
         ax.set_aspect('equal')
-        plt.show()
         return fig, ax
 
 ##### Obstacles #####

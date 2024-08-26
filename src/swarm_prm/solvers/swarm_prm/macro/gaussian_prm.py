@@ -87,7 +87,7 @@ class GaussianPRM:
     """
 
     def __init__(self, map:Roadmap, instance:GaussianMixtureInstance, num_samples, 
-                 alpha=0.9, cvar_threshold=-0.02,
+                 alpha=0.95, cvar_threshold=-8,
                  mc_threshold=0.02,
                  safety_radius=2,
                  swarm_prm_covariance_scaling=5,
@@ -197,7 +197,7 @@ class GaussianPRM:
         else:
             assert False, "Unimplemented sampling strategy"
 
-    def build_roadmap(self, kd_radius=10, roadmap_method="KDTREE", collision_check_method="MONTE_CARLO"):
+    def build_roadmap(self, kd_radius=10, roadmap_method="KDTREE", collision_check_method="CVAR"):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
@@ -219,12 +219,12 @@ class GaussianPRM:
             tri = Delaunay([(sample[0], sample[1]) for sample in self.samples])
             for i, simplex in enumerate(tri.simplices):
                 for i in range(-1, 2):
-# 
+
                     if (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
                         and not self.map.is_gaussian_trajectory_collision(
-                             self.gaussian_nodes[i],
-                             self.gaussian_nodes[i+1],
+                             self.gaussian_nodes[simplex[i]],
+                             self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method):
                         self.roadmap.append((simplex[i], simplex[i+1]))
 
@@ -247,7 +247,7 @@ class GaussianPRM:
             paths.
         """
 
-    def visualize_map(self, fname):
+    def visualize_roadmap(self, fname):
         """
             Visualize Gaussian PRM
         """
