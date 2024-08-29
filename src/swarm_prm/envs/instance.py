@@ -1,35 +1,52 @@
 """
     Instance objects
 """
+from matplotlib import pyplot as plt
 import numpy as np 
 import os
 import yaml
 
-from swarm_prm.envs.roadmap import Roadmap, RoadmapLoader
-from swarm_prm.solvers.swarm_prm.macro.gaussian_prm import GaussianNode
+from swarm_prm.envs.map import Map, MapLoader
+from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import GaussianGraphNode
 
 ##### Instance #####
 
-class Instance():
-    def __init__(self, roadmap) -> None:
-        pass
+class Instance:
+    def __init__(self, map:Map, starts:list[GaussianGraphNode], goals:list[GaussianGraphNode],
+                 starts_weight, goals_weight) -> None:
+        self.map = map
+        self.starts = starts
+        self.goals = goals
+        self.starts_weight = starts_weight
+        self.goals_weight = goals_weight
 
-    def add_start(self, start:GaussianNode):
-        pass
+    def add_start(self, start):
+        self.starts.append(start)
+
+    def add_goal(self, goal):
+        self.goals.append(goal)
 
     def visualize(self):
         """
             Visualize instance
         """
-        pass
+        fig, ax = plt.subplots()
+        self.map.visualize(ax=ax)
+
+        for start in self.starts:
+            start.visualize(ax, edgecolor="green")
+
+        for goal in self.goals:
+            goal.visualize(ax, edgecolor="blue")
+
 
 ##### Instance Generator #####
 
 class InstanceGenerator:
-    def __init__(self, map:Roadmap, num_agents, num_starts, num_goals, agent_radius=5,
+    def __init__(self, map:Map, num_agents, num_starts, num_goals, agent_radius=5,
                  instance_count=10, instance_dir="data/envs/instances") -> None:
 
-        self.map = map
+        self.roadmap = map
         self.num_agents = num_agents
 
         self.num_starts = num_starts
@@ -69,14 +86,16 @@ class InstanceGenerator:
         """
             add random start and goal GMMs for agents on the map
         """
-        min_x, max_x, min_y, max_y = 0, self.map.width, 0, self.map.height
+        min_x, max_x, min_y, max_y = 0, self.roadmap.width, 0, self.roadmap.height
         while len(self.starts) < self.num_starts:
             x = np.random.uniform(min_x, max_x)
             y = np.random.uniform(min_y, max_y)
             node = np.array((x, y))
-            if self.map.is_point_collision(node):
+            if self.roadmap.is_point_collision(node):
                 continue
-            if self.map.get_clear_radius(node) < 10:
+
+            # Using a threshhold to guarantee available space for start locations
+            if self.roadmap.get_clear_radius(node) < 10:
                 continue
             mean = np.array((x, y))
             cov = 100 * np.identity(2)
@@ -86,9 +105,9 @@ class InstanceGenerator:
             x = np.random.uniform(min_x, max_x)
             y = np.random.uniform(min_y, max_y)
             node = np.array((x, y))
-            if self.map.is_point_collision(node):
+            if self.roadmap.is_point_collision(node):
                 continue
-            if self.map.get_clear_radius(node) < 10:
+            if self.roadmap.get_clear_radius(node) < 10:
                 continue
             mean = np.array((x, y))
             cov = 100 * np.identity(2)
@@ -134,9 +153,9 @@ class InstanceGenerator:
         instance_dict["goals_weights"] = self.goals_weights
 
         instance_dict["num_agents"] = self.num_agents
-        instance_dict["map_name"] = self.map.map_name
+        instance_dict["map_name"] = self.roadmap.map_name
 
-        instance_name = "{}_agent{}.yaml".format(self.map.map_name, self.num_agents) 
+        instance_name = "{}_agent{}.yaml".format(self.roadmap.map_name, self.num_agents) 
         with open(os.path.join(self.instance_dir, instance_name), "w") as f:
             yaml.dump(instance_dict, f, sort_keys=False)
 
@@ -157,21 +176,16 @@ class InstanceLoader:
         
         with open(fname, "r") as f:
             data = f.read()
+
         instance_dict = yaml.load(data, Loader=yaml.SafeLoader)
         instance = Instance()
+        roadmap_fname = instance_dict["roadmap_fname"]
+        roadmap_loader = MapLoader(instance_dict["roadmap_fname"])
         # roadmap = Map(map_dict["width"], map_dict["height"])
         # for obs in map_dict["obstacles"]:
             # roadmap.add_obstacle(CircleObstacle([obs["x"], obs["y"]], obs["radius"]))
-        roadmap_loader = RoadmapLoader(instance_dict["map_fname"])
-        self.roadmap = roadmap_loader.get_map()
+        self.map = roadmap_loader.get_map()
+        return instance
  
-        pass
-
     def get_instance(self):
-        pass
-
-    def visualize(self):
-        """
-            Visualize instance
-        """
         pass

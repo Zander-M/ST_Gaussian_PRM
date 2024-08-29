@@ -9,11 +9,11 @@ import os
 from scipy.stats import norm
 import yaml
 
-from swarm_prm.solvers.swarm_prm.macro.gaussian_mixture import GaussianNode
+from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import GaussianNode
 
 ##### Map       #####
 
-class Roadmap:
+class Map:
     def __init__(self, width, height, map_name=None) -> None:
         self.width = width
         self.height = height
@@ -152,11 +152,12 @@ class Roadmap:
                     return True
             return False
 
-    def visualize(self):
+    def visualize(self, fig=None, ax=None):
         """
             Visualize map
         """
-        fig, ax = plt.subplots()
+        if ax is None:
+            fig, ax = plt.subplots()
         ax.set_xlim([0, self.width])
         ax.set_ylim([0, self.height])
         for obs in self.get_obstacles():
@@ -385,16 +386,16 @@ class MapGenerator:
         self.height = height
         self.radius_min= radius_min
         self.radius_max = radius_max
-        self.map_fname= map_fname
-        self.map_count = map_count
+        self.roadmap_fname= map_fname
+        self.roadmap_count = map_count
         self.obs_count = obs_count
-        self.map_names = []
-        self.maps = []
-        for i in range(self.map_count):
-            self.map_names.append("{}_{:01d}.yaml".format(self.map_fname, i))
-            map_instance = Roadmap(self.width, self.height)
+        self.roadmap_names = []
+        self.roadmaps = []
+        for i in range(self.roadmap_count):
+            self.roadmap_names.append("{}_{:01d}.yaml".format(self.roadmap_fname, i))
+            map_instance = Map(self.width, self.height)
             self.add_obstacles(map_instance)
-            self.maps.append(map_instance)
+            self.roadmaps.append(map_instance)
 
     def add_obstacles(self, map_instance):
         """
@@ -415,7 +416,7 @@ class MapGenerator:
         """
             save map to yaml file
         """
-        for i, map_instance in enumerate(self.maps):
+        for i, map_instance in enumerate(self.roadmaps):
             map_dict = dict()
             map_dict["height"] = map_instance.height
             map_dict["width"] = map_instance.width
@@ -428,12 +429,12 @@ class MapGenerator:
                 if obs.obs_type == "CIRCLE":
                     d["radius"] = obs.radius
                 map_dict["obstacles"].append(d)
-            with open(os.path.join(self.map_dir, self.map_names[i]), "w") as f:
+            with open(os.path.join(self.roadmap_dir, self.roadmap_names[i]), "w") as f:
                 yaml.dump(map_dict, f, sort_keys=False)
 
 ##### Map Loader #####
 
-class RoadmapLoader:
+class MapLoader:
     """
         Return map object given yaml file
     """
@@ -442,16 +443,13 @@ class RoadmapLoader:
         with open(fname, "r") as f:
             data = f.read()
         map_dict = yaml.load(data, Loader=yaml.SafeLoader)
-        roadmap = Roadmap(map_dict["width"], map_dict["height"])
+        roadmap = Map(map_dict["width"], map_dict["height"])
         for obs in map_dict["obstacles"]:
             roadmap.add_obstacle(CircleObstacle([obs["x"], obs["y"]], obs["radius"]))
-        self.roadmap = roadmap
+        self.map = roadmap
     
     def get_map(self):
         """
-            Return Map
+            Get roadmap
         """
-        return self.roadmap, self.fname
-
-
- 
+        return self.map

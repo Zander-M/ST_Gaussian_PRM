@@ -10,31 +10,20 @@ from swarm_prm.solvers.swarm_prm.macro.gaussian_prm import GaussianPRM
 
 INF = 1e9 # used as infinite flow edge capacity 
 
-class TEGNode():
-    """
-        Time expanded graph node
-    """
-    def __init__(self, capacity, timestep, neighbors) -> None:
-        self.capacity = capacity
-        self.neighbors = neighbors
-        self.timestep = timestep
-
-    def get_neighbors(self):
-        """
-            Return neighboring nodes with updated 
-        """
-
 class TEGGraph():
     """
         Time expanded graph
     """
-    def __init__(self) -> None:
-        pass
+    def __init__(self, nodes, edges, node_capacities) -> None:
+        self.nodes = nodes
+        self.edges = edges
+        self.node_capacities = node_capacities
 
-    def construct_initial_teg(self, gaussian_prm:GaussianPRM):
+    def teg_search(self, gaussian_prm:GaussianPRM):
         """
-            Contruct initial teg
+            Find the earliest timestep that reaches the max flow
         """
+        
     
     def update_teg(self):
         """
