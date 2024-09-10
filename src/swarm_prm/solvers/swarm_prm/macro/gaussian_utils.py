@@ -2,6 +2,7 @@
     Gaussian Utils
 """
 
+from math import floor
 from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.linalg import sqrtm
@@ -86,23 +87,36 @@ class GaussianGraphNode(GaussianNode):
 
     def __init__(self, mean, covariance, type="RANDOM", alpha=.99, radius=None) -> None:
 
-        if type == "UNIFORM":
+        self.type = type
+        if self.type == "UNIFORM":
             super().__init__(mean, np.identity(2))
             assert radius is not None, "Radius is required for Uniform Gaussian initialization"
             self.radius = radius
             self.alpha = alpha
             self.set_covariance()
 
-        elif type == "RANDOM":
+        elif self.type == "RANDOM":
             super().__init__(mean, covariance)
             self.alpha = alpha
             self.radius = radius
 
-    def get_capacity(self):
+    def get_capacity(self, agent_radius):
         """
-            Compute capacity based on safe area.
+            Compute capacity based on safe area and agent radius.
         """
-        return np.pi*self.radius*self.radius
+        if self.type == "UNIFORM":
+            return floor((self.radius / agent_radius)**2)
+
+        elif self.type == "RANDOM":
+            eigenvalues, eigenvectors = np.linalg.eigh(self.covariance)
+            
+            # Sort eigenvalues and eigenvectors by descending eigenvalue
+            order = eigenvalues.argsort()[::-1]
+            eigenvalues = eigenvalues[order]
+            eigenvectors = eigenvectors[:, order]
+            chi2_value = chi2.ppf(self.alpha, 2) 
+            width, height = 2 * np.sqrt(chi2_value * eigenvalues)
+            return floor(width * height / (agent_radius * agent_radius))
 
     def get_mean(self):
         """

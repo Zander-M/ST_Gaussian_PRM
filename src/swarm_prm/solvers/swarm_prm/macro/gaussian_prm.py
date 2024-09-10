@@ -2,6 +2,7 @@
     Gaussian PRM based on map info.
 """
 from matplotlib import pyplot as plt
+from matplotlib.patches import Circle
 import numpy as np
 
 from scipy.spatial import KDTree, Delaunay
@@ -42,6 +43,7 @@ class GaussianPRM:
         # SwarmPRM Sampling strategy
         self.swarm_prm_covariance_scalling= swarm_prm_covariance_scaling
 
+        # Map related 
         self.samples = []
         self.gaussian_nodes = []
         self.roadmap = []
@@ -176,26 +178,7 @@ class GaussianPRM:
                              collision_check_method=collision_check_method):
                         self.roadmap.append((simplex[i], simplex[i+1]))
 
-    def get_csgraph(self):
-        """
-            Convert Roadmap to scipy csgraph for graph search algorithms
-            TODO: Implement this 
-        """
-        pass
-
-    def astar_search(self, start, goal):
-        """
-            A star search on abstract graph
-        """
-        pass
-
-    def gmm_search(self):
-        """
-            Use linear programming to find the weight assigned to different solution
-            paths.
-        """
-
-    def visualize_roadmap(self, fname):
+    def visualize_roadmap(self, fname="test_gaussian_prm.png"):
         """
             Visualize Gaussian PRM
         """
@@ -221,13 +204,13 @@ class GaussianPRM:
 
         for obs in self.map.obstacles:
             ox, oy = obs.get_pos()
-            ax.add_patch(plt.Circle((ox, oy), radius=obs.radius, color="black"))
+            ax.add_patch(Circle((ox, oy), radius=obs.radius, color="black"))
 
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)
         ax.set_ylim(bottom=0, top=self.map.height)
         plt.savefig("{}.png".format(fname), dpi=400)
-        plt.show()
+        return fig, ax
     
     def visualize_g_nodes(self, fname):
         """
@@ -242,7 +225,7 @@ class GaussianPRM:
 
         for obs in self.map.obstacles:
             ox, oy = obs.get_pos()
-            ax.add_patch(plt.Circle((ox, oy), radius=obs.radius, color="black"))
+            ax.add_patch(Circle((ox, oy), radius=obs.radius, color="black"))
 
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)
@@ -250,8 +233,7 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
-    def visualize_solution(self):
+    def visualize_solution(self, flow_dict):
         """
-            Visualize solution paths
+            Visualize solution path per timestep provided the flow dict
         """
-        pass
