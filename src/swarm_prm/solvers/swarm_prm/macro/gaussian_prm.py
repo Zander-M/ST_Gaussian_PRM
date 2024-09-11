@@ -180,7 +180,7 @@ class GaussianPRM:
                              collision_check_method=collision_check_method):
                         self.roadmap.append((simplex[i], simplex[i+1]))
 
-    def visualize_roadmap(self, fname="test_gaussian_prm.png"):
+    def visualize_roadmap(self, fname="test_gaussian_prm"):
         """
             Visualize Gaussian PRM
         """
