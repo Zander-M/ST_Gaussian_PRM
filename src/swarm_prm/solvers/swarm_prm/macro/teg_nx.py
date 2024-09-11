@@ -20,42 +20,45 @@ class TEGGraph_NX:
         """
             Build TEG based on timestep
         """
+        from networkx.algorithms.flow import shortest_augmenting_path
         teg = nx.DiGraph()
         super_source = "SS"
-        super_goal = "SG"
+        super_sink = "SG"
 
+        node_idx = [i for i in range(len(self.gaussian_prm.samples))]
         # Adding timestep -1 node for visualization purpose
         # Visualization source and restricted_edges are hidden
         # duirng TEG visualization
 
         vis_source = "VS" 
         restricted_edges  = []
-        for vis_idx in range(1, 8):
+        for vis_idx in node_idx:
             edge = (vis_source, '{}_{}'.format(vis_idx, 0))
             teg.add_edge(edge[0], edge[1])
             restricted_edges.append(edge)
 
         # Adding super source and super goal to the graph
 
-        for start_idx in [1, 2]:
-            teg.add_edge(super_source, '{}_{}'.format(start_idx, 0))
+        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
+            teg.add_edge(super_source, '{}_{}'.format(start_idx, 0), 
+                         capacity=int(self.gaussian_prm.starts_weight[i]*self.target_flow))
 
-        for goal_idx in [6, 7]:
-            teg.add_edge('{}_{}'.format(goal_idx, timestep),super_goal)
+        for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
+            teg.add_edge('{}_{}'.format(goal_idx, timestep),super_sink,
+                         capacity=int(self.gaussian_prm.goals_weight[i]*self.target_flow))
 
         for t in range(timestep):
 
             # adding wait edges
-            for u in range(1, 8):
-                teg.add_edge('{}_{}'.format(u, t+1), '{}_{}'.format(u, t))
+            for u in node_idx:
+                teg.add_edge('{}_{}'.format(u, t), '{}_{}'.format(u, t+1))
 
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
                     teg.add_edge( '{}_{}'.format(v, t), '{}_{}'.format(u, t+1), capacity=capacity)
-                    teg.add_edge( '{}_{}'.format(u, t), '{}_{}'.format(v, t+1), capacity=capacity)
 
-        return super_source, super_goal, teg, restricted_edges
+        return super_source, super_sink, teg, restricted_edges
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
         """
@@ -83,9 +86,10 @@ class TEGGraph_NX:
         max_flow = 0
         flow_dict = {}
         while timestep < self.max_timestep:
-            super_source, super_goal, teg, restricted_edges = self.build_teg(timestep)
-            max_flow, flow_dict = nx.maximum_flow(teg, super_source, super_goal)
-            if max_flow > self.target_flow:
+            super_source, super_sink, teg, restricted_edges = self.build_teg(timestep)
+            max_flow, flow_dict = nx.maximum_flow(teg, super_source, super_sink)
+            print("timestep:", timestep, "max_flow:", max_flow)
+            if max_flow == self.target_flow:
                 return max_flow, flow_dict, timestep, teg, restricted_edges
             else:
                 timestep += 1

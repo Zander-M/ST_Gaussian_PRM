@@ -49,8 +49,8 @@ class GaussianPRM:
         self.roadmap = []
 
         self.shortest_paths = []
-        self.starts_idx = None
-        self.goals_idx = None
+        self.starts_idx = []
+        self.goals_idx = []
 
 
 
@@ -187,7 +187,7 @@ class GaussianPRM:
         # Nodes and Paths 
 
         for node in self.samples:
-            ax.plot(node[0], node[1], 'ro', markersize=2)
+            ax.plot(node[0], node[1], 'o', "gray", markersize=2)
         for (i, j) in self.roadmap:
             ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
 
@@ -233,7 +233,20 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
-    def visualize_solution(self, flow_dict):
+    def visualize_solution(self, flow_dict, timestep):
         """
             Visualize solution path per timestep provided the flow dict
         """
+        node_idx = [i for i in range(len(self.samples))]
+        for t in range(timestep):
+            fig, ax = self.visualize_roadmap()
+
+            # plot path at each timestep
+            for i in node_idx:
+                u = '{}_{}'.format(i, t)
+                for j in node_idx:
+                    v = '{}_{}'.format(j, t+1)
+                    if v in flow_dict[u] and flow_dict[u][v] != 0:
+                        ax.plot([self.samples[i][0], self.samples[j][0]], 
+                                [self.samples[i][1], self.samples[j][1]], 
+                                'r', linestyle='-', linewidth=1)
