@@ -2,6 +2,7 @@
     Gaussian PRM based on map info.
 """
 from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
 import numpy as np
 
@@ -146,7 +147,7 @@ class GaussianPRM:
             assert False, "Unimplemented sampling strategy"
         self.new_node_idx = len(self.samples)
 
-    def build_roadmap(self, kd_radius=10, roadmap_method="KDTREE", collision_check_method="CVAR"):
+    def build_roadmap(self, radius=10, roadmap_method="KDTREE", collision_check_method="CVAR"):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
@@ -156,7 +157,7 @@ class GaussianPRM:
         if roadmap_method == "KDTREE":
             kd_tree = KDTree([(sample[0], sample[1]) for sample in self.samples])
             for i, node in enumerate(self.samples):
-                indices = kd_tree.query_ball_point(node, r=kd_radius)
+                indices = kd_tree.query_ball_point(node, r=radius)
 
                 # Edge must be collision free with the environment
                 edges = [(i, idx) for idx in indices \
@@ -172,6 +173,7 @@ class GaussianPRM:
                 for i in range(-1, 2):
                     if (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
+                        and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
                         and not self.map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[simplex[i]],
                              self.gaussian_nodes[simplex[i+1]],
@@ -187,7 +189,7 @@ class GaussianPRM:
         # Nodes and Paths 
 
         for node in self.samples:
-            ax.plot(node[0], node[1], 'o', "gray", markersize=2)
+            ax.plot(node[0], node[1], 'co', markersize=2)
         for (i, j) in self.roadmap:
             ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
 
@@ -209,7 +211,7 @@ class GaussianPRM:
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)
         ax.set_ylim(bottom=0, top=self.map.height)
-        plt.savefig("{}.png".format(fname), dpi=400)
+        plt.savefig("{}.png".format(fname))
         return fig, ax
     
     def visualize_g_nodes(self, fname):
@@ -233,7 +235,7 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
-    def visualize_solution(self, flow_dict, timestep):
+    def visualize_solution(self, flow_dict, timestep, num_agent):
         """
             Visualize solution path per timestep provided the flow dict
         """
@@ -249,4 +251,57 @@ class GaussianPRM:
                     if v in flow_dict[u] and flow_dict[u][v] != 0:
                         ax.plot([self.samples[i][0], self.samples[j][0]], 
                                 [self.samples[i][1], self.samples[j][1]], 
-                                'r', linestyle='-', linewidth=1)
+                                'r', linestyle='-', linewidth=flow_dict[u][v]/num_agent * 20)
+
+    def animate_solution(self, flow_dict, timestep, num_agent):
+        """
+            Animate solution paths
+        """
+        node_idx = [i for i in range(len(self.samples))]
+
+        def get_segments(timestep):
+            data = []
+            for t in range(timestep):
+                segments = []
+                for i in node_idx:
+                    u = '{}_{}'.format(i, t)
+                    for j in node_idx:
+                        v = '{}_{}'.format(j, t+1)
+                        if v in flow_dict[u] and flow_dict[u][v] != 0:
+                            # [x, y, capacity]
+                            segments.append([
+                                [self.samples[i][0], self.samples[j][0]], 
+                                [self.samples[i][1], self.samples[j][1]],
+                                flow_dict[u][v]
+                                ])
+                data.append(segments)
+            return data
+
+        # Plotting map
+        data = get_segments(timestep)
+        fig, ax = self.visualize_roadmap()
+
+        # Animate functions
+        lines = []
+
+        def init():
+            for line in lines:
+                line.remove()
+            lines.clear()
+            return []
+        
+        def update(frame):
+            for line in lines:
+                line.remove()
+            lines.clear()
+
+            segments = data[frame]
+            for x, y, capacity in segments:
+                line, = ax.plot(x, y, color='r', lw=capacity/num_agent*20)
+                lines.append(line)
+            return lines
+        anim = FuncAnimation(fig, update, frames=timestep, init_func=init,
+                             blit=True, interval=100)
+        anim.save("solution_path.gif", writer='pillow', fps=6)
+
+
