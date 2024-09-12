@@ -4,6 +4,7 @@
 
 from abc import abstractmethod
 from matplotlib import pyplot as plt
+from matplotlib.patches import Circle
 import numpy as np
 import os
 from scipy.stats import norm
@@ -151,6 +152,8 @@ class Map:
                 if obs.is_gaussian_colliding(g_node, alpha, cvar_threshold):
                     return True
             return False
+        else: 
+            assert False, "Unimplemented Collision Checking Method"
 
     def visualize(self, fig=None, ax=None):
         """
@@ -163,7 +166,7 @@ class Map:
         for obs in self.get_obstacles():
             x, y = obs.get_pos()
             # ax.plot(x, y, 'ro', markersize=3)
-            ax.add_patch(plt.Circle((x, y), radius=obs.radius, color="black"))
+            ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
         ax.set_aspect('equal')
         return fig, ax
 
@@ -176,7 +179,8 @@ class Obstacle:
 
     def __init__(self, pos, obs_type):
         self.pos = pos
-        self.obs_type= obs_type 
+        self.obs_type = obs_type 
+        self.radius = 0
 
     def get_pos(self):
         """
@@ -185,35 +189,35 @@ class Obstacle:
         return self.pos
 
     @abstractmethod
-    def get_dist(self, point) -> float:
+    def get_dist(self, point):
         """
             check point to obstacle distance
         """
         assert False, "get_dist not implemented"
 
     @abstractmethod
-    def is_point_colliding(self, point) -> bool:
+    def is_point_colliding(self, point):
         """
             check if point collides with obstacle 
         """
         assert False, "is_point_colliding not implemented"
 
     @abstractmethod
-    def is_line_colliding(self, line_start, line_end) -> bool:
+    def is_line_colliding(self, line_start, line_end):
         """
             check if line collides with obstacle 
         """
         assert False, "is_line_colliding not implemented"
 
     @abstractmethod
-    def is_radius_colliding(self, point, radius) -> bool:
+    def is_radius_colliding(self, point, radius):
         """
             check if obstacles is with the radius distance from the point
         """
         assert False, "is_radius_colliding not implemented"
     
     @abstractmethod
-    def is_gaussian_colliding(self, g_node:GaussianNode, cvar, threshold) -> bool:
+    def is_gaussian_colliding(self, g_node:GaussianNode, alpha, threshold):
         """
             check if Gaussian distribution is too close to the obstacles
         """
@@ -234,7 +238,7 @@ class CircleObstacle(Obstacle):
         """
         return np.linalg.norm(point-self.pos)-self.radius
 
-    def is_point_colliding(self, point) -> bool:
+    def is_point_colliding(self, point):
         return self.get_dist(point) <= 0 
 
     def is_line_colliding(self, line_start, line_end):
@@ -263,7 +267,7 @@ class CircleObstacle(Obstacle):
     def is_radius_colliding(self, point, radius) -> bool:
         return self.get_dist(point) <= radius 
 
-    def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold) -> bool:
+    def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold):
         """
             Using CVaR and threshold to test if node is too close to obstacle.
             Return True if CVaR is greater than the threshold.
@@ -362,17 +366,17 @@ class PolygonObstacle(Obstacle):
         else:
             return np.linalg.norm(ac_perp)
 
-    def is_line_colliding(self, line_start, line_end) -> bool:
+    def is_line_colliding(self, line_start, line_end):
         return super().is_line_colliding(line_start, line_end)
 
-    def is_point_colliding(self, line_start, line_end) -> bool:
-        return super().is_line_colliding(line_start, line_end)
+    def is_point_colliding(self, point):
+        return super().is_point_colliding(point)
 
-    def is_radius_colliding(self, point, radius) -> bool:
+    def is_radius_colliding(self, point, radius):
         return super().is_radius_colliding(point, radius)
     
-    def is_gaussian_colliding(self, g_node: GaussianNode) -> bool:
-        return super().is_gaussian_colliding(g_node)
+    def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold):
+        return super().is_gaussian_colliding(g_node, alpha, threshold)
 
 ##### Map Generator #####
 
@@ -381,13 +385,14 @@ class MapGenerator:
         Map generator. Generate yaml file representing the map config.
     """
     def __init__(self, width, height, radius_min=5, radius_max=10, map_count=10, 
-                obs_count=10, map_fname="map", map_dir="data/envs/maps") -> None:
+                obs_count=10, map_fname="map", roadmap_dir="data/envs/maps") -> None:
         self.width = width
         self.height = height
         self.radius_min= radius_min
         self.radius_max = radius_max
         self.roadmap_fname= map_fname
         self.roadmap_count = map_count
+        self.roadmap_dir = roadmap_dir
         self.obs_count = obs_count
         self.roadmap_names = []
         self.roadmaps = []

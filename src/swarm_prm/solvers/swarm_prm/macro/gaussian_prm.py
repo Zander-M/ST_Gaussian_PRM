@@ -7,6 +7,7 @@ from matplotlib.patches import Circle
 import numpy as np
 
 from scipy.spatial import KDTree, Delaunay
+from scipy.stats.qmc import Halton
 
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import *
@@ -112,6 +113,27 @@ class GaussianPRM:
                     g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                     self.samples.append(node)               
                     self.gaussian_nodes.append(g_node)
+
+        elif sampling_strategy == "UNIFORM_HALTON":
+            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            halton_sampler = Halton(d=2) # 2d Halton sampler
+
+            while len(self.samples) < self.num_samples:
+                num_to_generate = max(self.num_samples * 2, 100)
+                samples = halton_sampler.random(num_to_generate)
+                nodes = samples * np.array([self.map.width, self.map.height])
+
+                # covariance will be automatically updated.
+                for node in nodes:
+                    if not self.map.is_radius_collision(node, self.safety_radius):
+                        radius = np.inf
+                        for obs in self.map.obstacles:
+                            radius = min(radius, obs.get_dist(node))
+                        g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
+                        self.samples.append(node)               
+                        self.gaussian_nodes.append(g_node)
+                        if len(self.samples) >= self.num_samples:
+                            break
 
         elif sampling_strategy == "SWARMPRM":
             """

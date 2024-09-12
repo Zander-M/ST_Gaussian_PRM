@@ -4,6 +4,7 @@
 from matplotlib import pyplot as plt
 import numpy as np 
 import os
+from typing import List
 import yaml
 
 from swarm_prm.envs.map import Map, MapLoader
@@ -12,13 +13,14 @@ from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import GaussianGraphNode
 ##### Instance #####
 
 class Instance:
-    def __init__(self, map:Map, starts:list[GaussianGraphNode], goals:list[GaussianGraphNode],
-                 starts_weight, goals_weight) -> None:
+    def __init__(self, map:Map, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode],
+                 starts_weight, goals_weight, num_agent) -> None:
         self.map = map
         self.starts = starts
         self.goals = goals
         self.starts_weight = starts_weight
         self.goals_weight = goals_weight
+        self.num_agent = num_agent
 
     def add_start(self, start):
         self.starts.append(start)
@@ -57,8 +59,6 @@ class InstanceGenerator:
         self.starts = []
         self.goals = []
 
-        self.starts_num_agents = []
-        self.goals_num_agents = []
         self.starts_weights = []
         self.goals_weights = []
 
@@ -69,8 +69,8 @@ class InstanceGenerator:
             Add start node
         """
         start_dict = {}
-        start_dict["mean"] = mean.to_list()
-        start_dict["covariance"] = covariance.to_list()
+        start_dict["mean"] = mean.tolist() 
+        start_dict["covariance"] = covariance.flatten().tolist()
         self.starts.append(start_dict)
 
     def add_goal(self, mean:np.ndarray, covariance:np.ndarray):
@@ -78,8 +78,8 @@ class InstanceGenerator:
             Add goal node
         """
         goal_dict = {}
-        goal_dict["mean"] = mean.to_list()
-        goal_dict["covariance"] = covariance.to_list()
+        goal_dict["mean"] = mean.tolist()
+        goal_dict["covariance"] = covariance.flatten().tolist()
         self.goals.append(goal_dict)
 
     def create_instance(self):
@@ -115,27 +115,22 @@ class InstanceGenerator:
 
         # Randomly assign the agents to the starts and the goals
         start_idx = 1
+        starts_num_agents = []
         for _ in range(self.num_starts-1):
             temp = np.random.randint(start_idx, self.num_agents)
-            self.starts_num_agents.append(temp-start_idx)
+            starts_num_agents.append(temp-start_idx)
             start_idx = temp
-        self.starts_num_agents.append(self.num_agents-start_idx)
+        starts_num_agents.append(self.num_agents-start_idx)
 
         goal_idx = 1
-        for _ in range(self.num_goal-1):
+        goals_num_agents = []
+        for _ in range(self.num_goals-1):
             temp = np.random.randint(goal_idx, self.num_agents)
-            self.goals_num_agents.append(temp-goal_idx)
+            goals_num_agents.append(temp-goal_idx)
             goal_idx = temp
-        self.goal_num_agents.append(self.num_agents-goal_idx)
-        self.update_weights()
-
-
-    def update_weights(self):
-        """
-            Update start/goal weights
-        """
-        self.starts_weights = np.array(self.starts_num_agents)/self.num_agents
-        self.goals_weights = np.array(self.goals_num_agents)/self.num_agents
+        goals_num_agents.append(self.num_agents-goal_idx)
+        self.starts_weights = np.array(starts_num_agents)/self.num_agents
+        self.goals_weights = np.array(goals_num_agents)/self.num_agents
 
     def to_yaml(self):
         """
@@ -146,9 +141,6 @@ class InstanceGenerator:
         instance_dict["starts"] = self.starts
         instance_dict["goals"] = self.goals
         
-        instance_dict["starts_num_agents"] = self.starts_num_agents
-        instance_dict["goals_num_agents"] = self.goals_num_agents
-
         instance_dict["starts_weights"] = self.starts_weights
         instance_dict["goals_weights"] = self.goals_weights
 
@@ -158,12 +150,6 @@ class InstanceGenerator:
         instance_name = "{}_agent{}.yaml".format(self.roadmap.map_name, self.num_agents) 
         with open(os.path.join(self.instance_dir, instance_name), "w") as f:
             yaml.dump(instance_dict, f, sort_keys=False)
-
-    def visualize_instance(self):
-        """
-            Visualize problem instance on the map
-        """
-        pass
 
 ##### Instance Loader #####
 
@@ -178,14 +164,27 @@ class InstanceLoader:
             data = f.read()
 
         instance_dict = yaml.load(data, Loader=yaml.SafeLoader)
-        instance = Instance()
-        roadmap_fname = instance_dict["roadmap_fname"]
         roadmap_loader = MapLoader(instance_dict["roadmap_fname"])
-        # roadmap = Map(map_dict["width"], map_dict["height"])
-        # for obs in map_dict["obstacles"]:
-            # roadmap.add_obstacle(CircleObstacle([obs["x"], obs["y"]], obs["radius"]))
-        self.map = roadmap_loader.get_map()
-        return instance
+        roadmap = roadmap_loader.get_map()
+
+        starts = []
+        for start in instance_dict["starts"]:
+            mean = np.array(start["mean"]) 
+            cov = np.array(start["covariance"]).reshape((2, 2)) 
+            starts.append(GaussianGraphNode(mean, cov))
+
+        goals = []
+        for goal in instance_dict["goals"]:
+            mean = np.array(goal["mean"]).astype(np.float32) 
+            cov = np.array(goal["covariance"]).astype(np.float32).reshape((2, 2)) 
+            goals.append(GaussianGraphNode(mean, cov))
+        
+        starts_weight = np.array(instance_dict["starts_weights"])
+        goals_weight = np.array(instance_dict["goals_weights"])
+
+        num_agent = instance_dict["num_agents"]
+        
+        self.instance = Instance(roadmap, starts, goals, starts_weight, goals_weight, num_agent)
  
     def get_instance(self):
-        pass
+        return self.instance
