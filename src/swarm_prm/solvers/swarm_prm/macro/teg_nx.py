@@ -95,6 +95,14 @@ class TEGGraph_NX:
                 timestep += 1
 
         return None, None, None, None, None
+    
+    def flow_to_trajectory(self, flow_dict):
+        """
+            Convert Flow to Trajectories per agent
+        """
+        trajectory = []
+        return trajectory
+
 
     def visualize_teg(self, teg, restricted_edges):
         """
@@ -106,7 +114,7 @@ class TEGGraph_NX:
         # Draw the graph
         plt.figure(figsize=(10, 8))  # Set the size of the figure
         teg = teg.to_undirected()
-        pos = nx.bfs_layout(teg, "VS")  # Compute positions using the spring layout
+        pos = nx.bfs_layout(teg, "VS")  # type: ignore # Compute positions using the spring layout
         pos["SS"] = pos["VS"]
 
         # Hide visualization source and extra edges

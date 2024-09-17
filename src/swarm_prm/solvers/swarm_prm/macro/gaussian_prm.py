@@ -125,7 +125,8 @@ class GaussianPRM:
 
                 # covariance will be automatically updated.
                 for node in nodes:
-                    if not self.map.is_radius_collision(node, self.safety_radius):
+                    # if not self.map.is_radius_collision(node, self.safety_radius):
+                    if not self.map.is_point_collision(node):
                         radius = np.inf
                         for obs in self.map.obstacles:
                             radius = min(radius, obs.get_dist(node))
@@ -179,7 +180,7 @@ class GaussianPRM:
         if roadmap_method == "KDTREE":
             kd_tree = KDTree([(sample[0], sample[1]) for sample in self.samples])
             for i, node in enumerate(self.samples):
-                indices = kd_tree.query_ball_point(node, r=radius)
+                indices = kd_tree.query_ball_point(node, radius, 2)
 
                 # Edge must be collision free with the environment
                 edges = [(i, idx) for idx in indices \
