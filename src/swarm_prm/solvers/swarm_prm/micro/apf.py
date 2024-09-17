@@ -8,18 +8,20 @@ class APFSingleStepSolver:
         Update one timestep for all agents and repeat
     """
     def __init__(self, map, macro_trajectory, agent_radius, solution_timestep, 
-                 step_size=0.1, max_timestep_iter=100, goal_thresh=0.1):
+                 step_size=0.1, att_coeff=0.2, rep_coeff=0.5, 
+                 max_timestep_iter=100, goal_thresh=0.1):
         self.map = map
         self.macro_trajectory = macro_trajectory
         self.agent_radius = agent_radius
         self.num_agent = len(self.macro_trajectory)
         self.solution_timestep = solution_timestep
-        self.step_size = step_size
         self.max_timestep_iter = max_timestep_iter
         self.goal_thresh = goal_thresh
         
-        self.att_coeff = 0.2
-        self.rep_coeff = 0.5
+        # Tune parameters here
+        self.step_size = step_size # step size
+        self.att_coeff = att_coeff
+        self.rep_coeff = rep_coeff
 
         self.solution_trajectory = []
         
@@ -50,17 +52,18 @@ class APFSingleStepSolver:
                 self.solution_trajectory[agent_idx].append(new_pos)
             timestep_iter += 1
         assert timestep_iter < self.max_timestep_iter, "Cannot find path to next goal within {self.max_timestep_iter} timesteps."
-            
 
     def get_f_att(self, agent_idx, timestep):
         """
             Compute attractive force for the agent at a timestep
+            TODO: compute attractive force
         """
         return np.array([0, 0])
 
     def get_f_rep(self, agent_idx, timestep):
         """
             Compute repelling force for the agent at a timestep
+            TODO: compute repelling force
         """
         return np.array([0, 0])
 
