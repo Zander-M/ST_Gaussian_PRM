@@ -8,6 +8,7 @@ from matplotlib.patches import Circle
 import numpy as np
 import os
 from scipy.stats import norm
+from shapely.geometry import Point
 import yaml
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import GaussianNode
@@ -377,6 +378,61 @@ class PolygonObstacle(Obstacle):
     
     def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold):
         return super().is_gaussian_colliding(g_node, alpha, threshold)
+
+class CircleObstacleShapely(Obstacle):
+    """
+        Circular obstacle using Shapely.
+    """
+    def __init__(self, pos, radius):
+        super().__init__(pos, "CIRCLE")
+        self.radius = radius
+        self.circle = Point(pos).buffer(radius)  # Create a circle using Shapely
+
+    def get_dist(self, point):
+        """
+            Distance from a point to the circle using Shapely.
+        """
+        point_geom = Point(point)
+        return point_geom.distance(self.circle) - self.radius
+
+    def is_point_colliding(self, point):
+        """
+            Check if the point is colliding with the circle.
+        """
+        point_geom = Point(point)
+        return self.circle.contains(point_geom)
+
+    def is_line_colliding(self, line_start, line_end):
+        """
+            Check if a line segment collides with the circle using Shapely.
+        """
+        from shapely.geometry import LineString
+        line = LineString([line_start, line_end])
+        return self.circle.intersects(line)
+
+    def is_radius_colliding(self, point, radius) -> bool:
+        """
+            Check if the point is within a certain radius of the circle.
+        """
+        return self.get_dist(point) <= radius 
+
+    def is_gaussian_colliding(self, g_node, alpha, threshold):
+        """
+            Check if the Gaussian distribution is colliding with the circle based on CVaR.
+        """
+        mean = -self.get_dist(g_node.get_mean())
+        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
+        variance = v_normal.T @ g_node.covariance @ v_normal
+        ita = norm(mean, variance)
+        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
+        return cvar > threshold
+        
+        mean = -self.get_dist(g_node.get_mean())
+        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
+        variance = v_normal.T @ g_node.covariance @ v_normal
+        ita = norm(mean, variance)
+        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
+        return cvar > threshold
 
 ##### Map Generator #####
 

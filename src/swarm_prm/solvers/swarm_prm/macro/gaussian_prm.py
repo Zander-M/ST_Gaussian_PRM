@@ -54,8 +54,6 @@ class GaussianPRM:
         self.starts_idx = []
         self.goals_idx = []
 
-
-
     def load_instance(self):
         """
             Load problem instance, adding start and target GMM nodes to the roadmap
