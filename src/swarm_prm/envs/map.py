@@ -8,7 +8,7 @@ from matplotlib.patches import Circle
 import numpy as np
 import os
 from scipy.stats import norm
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point, Polygon
 import yaml
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import GaussianNode
@@ -165,9 +165,10 @@ class Map:
         ax.set_xlim([0, self.width])
         ax.set_ylim([0, self.height])
         for obs in self.get_obstacles():
-            x, y = obs.get_pos()
-            # ax.plot(x, y, 'ro', markersize=3)
-            ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
+            if obs.obs_type == "CIRCLE": 
+                x, y = obs.get_pos()
+                # ax.plot(x, y, 'ro', markersize=3)
+                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
         ax.set_aspect('equal')
         return fig, ax
 
@@ -178,10 +179,23 @@ class Obstacle:
         Obstacles on the map
     """
 
-    def __init__(self, pos, obs_type):
+    def __init__(self, pos, obs_type, *args):
+        """
+            Obstacle base class
+            For Circle obstacle, pass in radius as args
+            For Polygon obstacle, pass in ABSOLUTE coordinates of the points
+        """
+
         self.pos = pos
         self.obs_type = obs_type 
-        self.radius = 0
+        if self.obs_type == "CIRCLE":
+            self.geom = Point(pos).buffer(args[0]) 
+            self.radius = args[0]
+        elif self.obs_type == "POLYGON":
+            self.geom = Polygon(args)
+            self.pos = np.array(self.geom.centroid)
+        else:
+            assert False, "Obstacle must be either circle or polygon."
 
     def get_pos(self):
         """
@@ -189,250 +203,45 @@ class Obstacle:
         """
         return self.pos
 
-    @abstractmethod
     def get_dist(self, point):
         """
             check point to obstacle distance
         """
-        assert False, "get_dist not implemented"
+        point_geom = Point(point)
+        return point_geom.distance(self.geom)
 
-    @abstractmethod
     def is_point_colliding(self, point):
         """
             check if point collides with obstacle 
         """
-        assert False, "is_point_colliding not implemented"
+        point_geom = Point(point)
+        return self.geom.contains(point_geom)
 
-    @abstractmethod
     def is_line_colliding(self, line_start, line_end):
         """
             check if line collides with obstacle 
         """
-        assert False, "is_line_colliding not implemented"
+        line = LineString([line_start, line_end])
+        return self.geom.intersects(line)
 
-    @abstractmethod
     def is_radius_colliding(self, point, radius):
         """
             check if obstacles is with the radius distance from the point
         """
-        assert False, "is_radius_colliding not implemented"
+        pt = Point(point).buffer(radius)
+        return self.geom.intersects(pt)
     
-    @abstractmethod
     def is_gaussian_colliding(self, g_node:GaussianNode, alpha, threshold):
         """
             check if Gaussian distribution is too close to the obstacles
         """
-
+        mean = -self.get_dist(g_node.get_mean())
+        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
+        variance = v_normal.T @ g_node.covariance @ v_normal
+        ita = norm(mean, variance)
+        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
+        return cvar > threshold
         assert False, "is_gaussian_colliding not implemented"
-
-class CircleObstacle(Obstacle):
-    """
-        Circular obstacle
-    """
-    def __init__(self, pos, radius):
-        super().__init__(pos, "CIRCLE")
-        self.radius = radius
-
-    def get_dist(self, point):
-        """
-            distance to circle
-        """
-        return np.linalg.norm(point-self.pos)-self.radius
-
-    def is_point_colliding(self, point):
-        return self.get_dist(point) <= 0 
-
-    def is_line_colliding(self, line_start, line_end):
-    
-        # Compute the line vector
-        line_vec = line_end - line_start
-        line_length = np.linalg.norm(line_vec)
-    
-        # Compute the vector from the start of the line to the point
-        point_vec = self.pos - line_start
-    
-        # Project point_vec onto line_vec to find the nearest point on the line
-        t = np.dot(point_vec, line_vec) / line_length**2
-    
-        # Restrict t to the range [0, 1] to stay within the line segment
-        t = max(0, min(1, t))
-    
-        # Find the nearest point on the line segment
-        nearest_point = line_start + t * line_vec
-    
-        # Compute the distance from the point to the nearest point on the line segment
-        distance = np.linalg.norm(self.pos - nearest_point)
-    
-        return distance <= self.radius
-    
-    def is_radius_colliding(self, point, radius) -> bool:
-        return self.get_dist(point) <= radius 
-
-    def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold):
-        """
-            Using CVaR and threshold to test if node is too close to obstacle.
-            Return True if CVaR is greater than the threshold.
-            Reference: SwarmPRM
-        """
-
-        mean = -self.get_dist(g_node.get_mean())
-        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
-        variance = v_normal.T @ g_node.covariance @ v_normal
-        ita = norm(mean, variance)
-        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
-        return cvar > threshold
-
-class PolygonObstacle(Obstacle):
-    """
-        Polygonal obstacle.
-        Vertices are relative to the absolute pos
-        TODO: fix gjk
-        TODO: fix collision check
-    """
-    def __init__(self, pos, nums):
-        super().__init__(pos, "Polygon")
-        self.polygon= []
-
-    def dist(self, point):
-        """
-            distance between a point and the polygon
-            computed with gjk algorithm 
-        """
-
-        def dot(v1, v2):
-            return np.dot(v1, v2)
-
-        def support(points, d):
-            """ 
-            Find the furthest point in the direction d from the origin in the set of points.
-            """
-            return max(points, key=lambda p: dot(p, d))
-
-        def perpendicular(v):
-            return np.array([-v[1], v[0]])
-
-        simplex = []
-        direction = point - self.polygon[0]  # Initial direction from the point to the first vertex of the polygon
-
-        while True:
-            # Get a new point in the direction
-            new_point = support(self.polygon, direction)
-    
-            # If the point we got is not past the origin in the direction, the distance is zero
-            if dot(new_point, direction) <= 0:
-                return 0
-
-            simplex.append(new_point)
-
-            if len(simplex) == 3:
-                # Get the edges of the triangle
-                a, b, c = simplex
-                ab = b - a
-                ac = c - a
-                ao = -a
-
-                # Perpendicular vectors to the edges
-                ab_perp = perpendicular(ab)
-                ac_perp = perpendicular(ac)
-
-                if dot(ab_perp, ao) > 0:
-                    simplex = [a, b]
-                    direction = ab_perp
-                else:
-                    simplex = [a, c]
-                    direction = ac_perp
-            else:
-                a, b = simplex
-                ab = b - a
-                ao = -a
-
-                direction = perpendicular(ab)
-                if dot(direction, ao) < 0:
-                    direction = -direction
-
-            if len(simplex) == 3:
-                break
-
-        # Calculate the distance from the point to the polygon
-        a, b, c = simplex
-        ab = b - a
-        ac = c - a
-        ao = -a
-
-        ab_perp = perpendicular(ab)
-        ac_perp = perpendicular(ac)
-
-        if dot(ab_perp, ao) > 0:
-            return np.linalg.norm(ab_perp)
-        else:
-            return np.linalg.norm(ac_perp)
-
-    def is_line_colliding(self, line_start, line_end):
-        return super().is_line_colliding(line_start, line_end)
-
-    def is_point_colliding(self, point):
-        return super().is_point_colliding(point)
-
-    def is_radius_colliding(self, point, radius):
-        return super().is_radius_colliding(point, radius)
-    
-    def is_gaussian_colliding(self, g_node: GaussianNode, alpha, threshold):
-        return super().is_gaussian_colliding(g_node, alpha, threshold)
-
-class CircleObstacleShapely(Obstacle):
-    """
-        Circular obstacle using Shapely.
-    """
-    def __init__(self, pos, radius):
-        super().__init__(pos, "CIRCLE")
-        self.radius = radius
-        self.circle = Point(pos).buffer(radius)  # Create a circle using Shapely
-
-    def get_dist(self, point):
-        """
-            Distance from a point to the circle using Shapely.
-        """
-        point_geom = Point(point)
-        return point_geom.distance(self.circle) - self.radius
-
-    def is_point_colliding(self, point):
-        """
-            Check if the point is colliding with the circle.
-        """
-        point_geom = Point(point)
-        return self.circle.contains(point_geom)
-
-    def is_line_colliding(self, line_start, line_end):
-        """
-            Check if a line segment collides with the circle using Shapely.
-        """
-        from shapely.geometry import LineString
-        line = LineString([line_start, line_end])
-        return self.circle.intersects(line)
-
-    def is_radius_colliding(self, point, radius) -> bool:
-        """
-            Check if the point is within a certain radius of the circle.
-        """
-        return self.get_dist(point) <= radius 
-
-    def is_gaussian_colliding(self, g_node, alpha, threshold):
-        """
-            Check if the Gaussian distribution is colliding with the circle based on CVaR.
-        """
-        mean = -self.get_dist(g_node.get_mean())
-        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
-        variance = v_normal.T @ g_node.covariance @ v_normal
-        ita = norm(mean, variance)
-        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
-        return cvar > threshold
-        
-        mean = -self.get_dist(g_node.get_mean())
-        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
-        variance = v_normal.T @ g_node.covariance @ v_normal
-        ita = norm(mean, variance)
-        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
-        return cvar > threshold
 
 ##### Map Generator #####
 
@@ -506,7 +315,7 @@ class MapLoader:
         map_dict = yaml.load(data, Loader=yaml.SafeLoader)
         roadmap = Map(map_dict["width"], map_dict["height"])
         for obs in map_dict["obstacles"]:
-            roadmap.add_obstacle(CircleObstacle([obs["x"], obs["y"]], obs["radius"]))
+            roadmap.add_obstacle(Obstacle([obs["x"], obs["y"]], "CIRCLE", obs["radius"]))
         self.map = roadmap
     
     def get_map(self):
