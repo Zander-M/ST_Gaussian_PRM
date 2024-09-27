@@ -162,6 +162,13 @@ class GaussianPRM:
                     self.samples.append(mean)
                     self.gaussian_nodes.append(g_node)
 
+        elif sampling_strategy == "CVT":
+            """
+                Iteratively update Voronoi region as sample points
+                TODO: implement this
+            """
+            pass
+
         elif sampling_strategy == "GAUSSIAN":
             assert False, "Unimplemented Gaussian sampling strategy"
         else:
@@ -200,6 +207,12 @@ class GaussianPRM:
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method):
                         self.roadmap.append((simplex[i], simplex[i+1]))
+
+        elif roadmap_method == "VORONOI":
+            """
+                Construct roadmap by creating voronoi cells based on sampled points
+            """
+            pass
 
     def visualize_roadmap(self, fname="test_gaussian_prm"):
         """

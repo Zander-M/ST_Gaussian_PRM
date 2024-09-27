@@ -1,7 +1,10 @@
 """
-    artificial potential field solvers for finding solution paths
+    Artificial potential field solvers for finding solution paths given Gaussian trajectory
+    Consider roadmaps with different resolutions
 """
 import numpy as np
+
+from swarm_prm.macro.gaussian_utils import GaussianNode
 
 class APFSingleStepSolver:
     """
@@ -9,14 +12,14 @@ class APFSingleStepSolver:
     """
     def __init__(self, map, macro_trajectory, agent_radius, solution_timestep, 
                  step_size=0.1, att_coeff=0.2, rep_coeff=0.5, 
-                 max_timestep_iter=100, goal_thresh=0.1):
+                 max_timestep_iter=100, reach_thresh=0.1):
         self.map = map
         self.macro_trajectory = macro_trajectory
         self.agent_radius = agent_radius
         self.num_agent = len(self.macro_trajectory)
         self.solution_timestep = solution_timestep
         self.max_timestep_iter = max_timestep_iter
-        self.goal_thresh = goal_thresh
+        self.goal_thresh = reach_thresh
         
         # Tune parameters here
         self.step_size = step_size # step size

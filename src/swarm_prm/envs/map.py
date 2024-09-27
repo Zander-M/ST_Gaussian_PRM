@@ -279,7 +279,7 @@ class MapGenerator:
             y = np.random.random() * self.height
             rand = np.random.random()
             radius = rand * self.radius_min + (1-rand) * self.radius_max
-            obs = CircleObstacle((x, y), radius)
+            obs = Obstacle((x, y), "CIRCLE", radius)
             map_instance.add_obstacle(obs)
 
     def to_yaml(self):
