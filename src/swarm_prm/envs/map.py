@@ -506,7 +506,7 @@ class MapLoader:
         map_dict = yaml.load(data, Loader=yaml.SafeLoader)
         roadmap = Map(map_dict["width"], map_dict["height"])
         for obs in map_dict["obstacles"]:
-            roadmap.add_obstacle(CircleObstacle([obs["x"], obs["y"]], obs["radius"]))
+            roadmap.add_obstacle(CircleObstacleShapely([obs["x"], obs["y"]], obs["radius"]))
         self.map = roadmap
     
     def get_map(self):
