@@ -130,4 +130,4 @@ dmypy.json
 
 # utils
 utils/
-
+test_*
