@@ -5,10 +5,8 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
 import numpy as np
-
 from scipy.spatial import KDTree, Delaunay
 from scipy.stats.qmc import Halton
-
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import *
 from swarm_prm.envs.instance import Instance
@@ -75,6 +73,12 @@ class GaussianPRM:
         self.sample_free_space() # sample node locations 
         self.load_instance() # adding problem instance nodes to roadmap
         self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
+
+    def cvt_roadmap_construction(self):
+        """
+            Iteratively update roadmap using CVT optimization
+        """
+        
 
     def sample_free_space(self, sampling_strategy="UNIFORM", collision_check_method="CVAR"):
         """
