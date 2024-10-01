@@ -336,6 +336,6 @@ class GaussianPRM:
             return lines
         anim = FuncAnimation(fig, update, frames=timestep, init_func=init,
                              blit=True, interval=100)
-        anim.save("solution_path.gif", writer='pillow', fps=6)
+        anim.save("test_solution_path.gif", writer='pillow', fps=6)
 
 
