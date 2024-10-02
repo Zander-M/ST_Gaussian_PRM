@@ -169,6 +169,9 @@ class Map:
                 x, y = obs.get_pos()
                 # ax.plot(x, y, 'ro', markersize=3)
                 ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
+            elif obs.obs_type == "POLYGON":
+                x, y = obs.geom.exterior.xy
+                ax.fill(x, y, fc="black")
         ax.set_aspect('equal')
         return fig, ax
 
@@ -192,8 +195,8 @@ class Obstacle:
             self.geom = Point(pos).buffer(args[0]) 
             self.radius = args[0]
         elif self.obs_type == "POLYGON":
-            self.geom = Polygon(args)
-            self.pos = np.array(self.geom.centroid)
+            self.geom = Polygon(args[0])
+            self.pos = np.array([self.geom.centroid.x, self.geom.centroid.y])
         else:
             assert False, "Obstacle must be either circle or polygon."
 
