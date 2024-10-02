@@ -40,6 +40,8 @@ class Instance:
 
         for goal in self.goals:
             goal.visualize(ax, edgecolor="blue")
+        
+        return fig, ax
 
 
 ##### Instance Generator #####

@@ -273,6 +273,42 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
+    def get_solution(self, flow_dict, timestep, num_agent):
+        """
+            Return macro solution path per agent
+        """
+        paths = []
+        for _ in range(num_agent):
+            paths.append([])
+            u = "SS"
+            while u != "SG":
+                for v in flow_dict[u]:
+                    if flow_dict[u][v] > 0:
+                        if v == "SG":
+                            flow_dict[u][v] -= 1
+                            u = v
+                            break
+                        else:
+                            idx = int(v.split("_")[0])
+                            paths[-1].append(idx)
+                            flow_dict[u][v] -= 1
+                            u = v
+                            break
+
+            # padding paths to solution length, agent waits at goal
+            wait_timestep = timestep - len(paths[-1])
+            paths[-1] = paths[-1] + [paths[-1][-1]] * wait_timestep
+
+
+        simple_paths = [] # positions
+        gaussian_paths = [] # Gaussian nodes
+        for path in paths:
+            simple_paths.append([self.samples[i] for i in path])
+            gaussian_paths.append([self.gaussian_nodes[i] for i in path])
+            
+
+        return simple_paths, gaussian_paths
+
     def visualize_solution(self, flow_dict, timestep, num_agent):
         """
             Visualize solution path per timestep provided the flow dict

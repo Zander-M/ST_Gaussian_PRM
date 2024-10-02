@@ -39,7 +39,7 @@ class Map:
             Return clear radius from the selected point. Equivalent to the distance
             to the closest obstacle
         """
-        clear_radius = np.Infinity
+        clear_radius = np.inf
         for obs in self.obstacles:
             clear_radius = min(clear_radius, obs.get_dist(point))
         return clear_radius
@@ -239,9 +239,8 @@ class Obstacle:
         v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
         variance = v_normal.T @ g_node.covariance @ v_normal
         ita = norm(mean, variance)
-        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance
+        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance # type: ignore
         return cvar > threshold
-        assert False, "is_gaussian_colliding not implemented"
 
 ##### Map Generator #####
 
