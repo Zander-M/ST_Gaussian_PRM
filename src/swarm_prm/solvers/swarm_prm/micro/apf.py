@@ -2,6 +2,10 @@
     Artificial potential field solvers for finding solution paths given Gaussian trajectory
     Consider roadmaps with different resolutions
 """
+from matplotlib import pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.patches import Circle
+
 import numpy as np
 from shapely.geometry import Point
 from shapely.ops import nearest_points
@@ -12,7 +16,7 @@ class APFSingleStepSolver:
     """
         Update one timestep for all agents and repeat
     """
-    def __init__(self, roadmap, macro_trajectory, agent_radius, solution_timestep, 
+    def __init__(self, roadmap, macro_trajectory, agent_radius, macro_timestep, 
                  step_size=0.1, att_coeff=0.2, rep_coeff=0.5, obs_thresh=1, 
                  max_timestep_iter=100, reach_thresh=0.1,
                  attract_strategy="UNIFORM", ordering_strategy="RANDOM"):
@@ -20,7 +24,7 @@ class APFSingleStepSolver:
         self.macro_trajectory = macro_trajectory
         self.agent_radius = agent_radius
         self.num_agent = len(self.macro_trajectory)
-        self.solution_timestep = solution_timestep
+        self.macro_timestep = macro_timestep
         self.max_timestep_iter = max_timestep_iter
         self.goal_thresh = reach_thresh
         self.attract_strategy = attract_strategy
@@ -33,6 +37,7 @@ class APFSingleStepSolver:
         self.obs_thresh = obs_thresh
 
         self.solution_trajectory = []
+        self.solution_length = 0
         
         # adding starting positions with noise
         for agent_idx in range(self.num_agent):
@@ -119,12 +124,56 @@ class APFSingleStepSolver:
         """
             Get total solution
         """
-        for t in range(self.solution_timestep):
+        for t in range(self.macro_timestep):
             if not self.update(t):
                 print("Early Termination")
-                return self.solution_trajectory
+                break
+
         print("Found solution")
+
+        # padding solutions
+        self.solution_length = 0 
+        for traj in self.solution_trajectory:
+            self.solution_length = max(len(traj), self.solution_length)
+        
+        for traj in self.solution_trajectory:
+            wait_len = self.solution_length - len(traj)
+            traj += [traj[-1]] * wait_len
+
         return self.solution_trajectory
+
+    def animate_solution(self):
+        """
+            Visualize solution trajectory
+        """
+        fig, ax = self.roadmap.visualize()
+        
+        agents = []
+
+        def init():
+            for agent in agents:
+                agent.remove()
+            agents.clear()
+            return []
+
+        def update(frame):
+            for agent in agents:
+                agent.remove()
+            agents.clear()
+            cmap = plt.get_cmap("tab10")
+            locs = [traj[frame] for traj in self.solution_trajectory]
+            for i, (x, y) in enumerate(locs):
+                agent, = ax.add_patch(Circle((x, y), radius=self.agent_radius, color=cmap(i%10)))
+                agents.append(agent)
+            return agents
+        anim = FuncAnimation(fig, update, frames=self.solution_length, 
+                             init_func=init, blit=True, interval=100)
+        anim.save("apf_solution.gif", writer='pillow', fps=6)
+
+
+
+
+
 
 class APFPPSolver:
     """
@@ -165,8 +214,8 @@ class APFPPSolver:
         timestep_iter = 0
         while False in reach_timestep_goal \
             and timestep_iter < self.max_timestep_iter * self.num_agent:
-            for agent_idx in order:
-                f_att = self.get_f_att(agent_idx, timestep)
+            for t in timestep:
+                f_att = self.get_f_att(agent_idx, t)
                 f_rep = self.get_f_rep(agent_idx)
                 f_total = f_att + f_rep 
                 f_total = f_total / np.linalg.norm(f_total) # normalize?
@@ -174,7 +223,7 @@ class APFPPSolver:
                 if self.roadmap.is_radius_collision(new_pos[0], self.agent_radius):
                     new_pos = self.solution_trajectory[agent_idx][-1] # wait if new position collide with obstacle
                 self.solution_trajectory[agent_idx].append(new_pos)
-            timestep_iter += 1
+                timestep_iter += 1
 
         if timestep_iter < self.max_timestep_iter:
             return False 
