@@ -69,6 +69,7 @@ class APFSingleStepSolver:
                     new_pos = self.solution_trajectory[agent_idx][-1] # wait if new position collide with obstacle
                 self.solution_trajectory[agent_idx].append(new_pos)
             timestep_iter += 1
+            # verify reaching condition
 
         if timestep_iter < self.max_timestep_iter:
             return False 
@@ -128,7 +129,6 @@ class APFSingleStepSolver:
             if not self.update(t):
                 print("Early Termination")
                 break
-
         print("Found solution")
 
         # padding solutions
@@ -136,17 +136,21 @@ class APFSingleStepSolver:
         for traj in self.solution_trajectory:
             self.solution_length = max(len(traj), self.solution_length)
         
+        padded_solution = []
+
         for traj in self.solution_trajectory:
             wait_len = self.solution_length - len(traj)
             traj += [traj[-1]] * wait_len
+            padded_solution.append(traj)
 
+        self.solution_trajectory = padded_solution
+        print(self.solution_trajectory)
         return self.solution_trajectory
 
-    def animate_solution(self):
+    def animate_solution(self, fig, ax):
         """
-            Visualize solution trajectory
+            Visualize solution trajectory provided instance
         """
-        fig, ax = self.roadmap.visualize()
         
         agents = []
 
@@ -162,10 +166,11 @@ class APFSingleStepSolver:
             agents.clear()
             cmap = plt.get_cmap("tab10")
             locs = [traj[frame] for traj in self.solution_trajectory]
-            for i, (x, y) in enumerate(locs):
-                agent, = ax.add_patch(Circle((x, y), radius=self.agent_radius, color=cmap(i%10)))
+            for i, loc in enumerate(locs):
+                agent, = ax.add_patch(Circle((loc[0, 0], loc[0, 1]), radius=self.agent_radius, color=cmap(i%10)))
                 agents.append(agent)
             return agents
+
         anim = FuncAnimation(fig, update, frames=self.solution_length, 
                              init_func=init, blit=True, interval=100)
         anim.save("apf_solution.gif", writer='pillow', fps=6)
