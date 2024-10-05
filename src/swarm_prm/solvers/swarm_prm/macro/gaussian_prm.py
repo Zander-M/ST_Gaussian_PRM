@@ -242,8 +242,13 @@ class GaussianPRM:
             goal.visualize(ax=ax, edgecolor="green")
 
         for obs in self.map.obstacles:
-            ox, oy = obs.get_pos()
-            ax.add_patch(Circle((ox, oy), radius=obs.radius, color="black"))
+            if obs.obs_type == "CIRCLE": 
+                x, y = obs.get_pos()
+                # ax.plot(x, y, 'ro', markersize=3)
+                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
+            elif obs.obs_type == "POLYGON":
+                x, y = obs.geom.exterior.xy
+                ax.fill(x, y, fc="black")
 
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)

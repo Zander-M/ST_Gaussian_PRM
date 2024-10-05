@@ -287,6 +287,7 @@ class MapGenerator:
     def to_yaml(self):
         """
             save map to yaml file
+            FIXME: does not work with polygon obstacles
         """
         for i, map_instance in enumerate(self.roadmaps):
             map_dict = dict()
