@@ -256,7 +256,7 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname))
         return fig, ax
     
-    def visualize_g_nodes(self, fname):
+    def visualize_g_nodes(self, fname="test_g_nodes"):
         """
             Visualize Gaussian Nodes on the map
         """
