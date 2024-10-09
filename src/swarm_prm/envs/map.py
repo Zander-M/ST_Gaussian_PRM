@@ -182,7 +182,7 @@ class Obstacle:
         Obstacles on the map
     """
 
-    def __init__(self, pos, obs_type, *args):
+    def __init__(self, pos, obs_type, *args, segment_length=2):
         """
             Obstacle base class
             For Circle obstacle, pass in radius as args
@@ -199,6 +199,7 @@ class Obstacle:
             self.pos = np.array([self.geom.centroid.x, self.geom.centroid.y])
         else:
             assert False, "Obstacle must be either circle or polygon."
+        self.segment_length = segment_length
 
     def get_pos(self):
         """
@@ -212,6 +213,29 @@ class Obstacle:
         """
         point_geom = Point(point)
         return point_geom.distance(self.geom)
+
+    def get_edge_segments(self):
+        """
+            Get edge segments for delaunay triangulation
+            Return: points, segmetns, pos 
+        """
+        if self.obs_type == "CIRCLE":
+            n_points = 2 * self.radius * np.pi // self.segment_length
+
+            # calculate points on the circle
+            i = np.arange(n_points)
+            theta = np.linspace(0, 2 * np.pi, n_points, endpoint=False)
+            pts = np.stack([np.cos(theta), np.sin(theta)], axis=1) * self.radius + self.get_pos()
+            segs = np.stack([i, i+1], axis=1) % n_points
+            return pts, segs, self.get_pos()
+
+        elif self.obs_type == "POLYGON":
+            """
+                
+            """
+        
+            pass
+    
 
     def is_point_colliding(self, point):
         """

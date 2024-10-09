@@ -5,8 +5,9 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
 import numpy as np
-from scipy.spatial import KDTree, Delaunay
+from scipy.spatial import KDTree, Delaunay, Voronoi
 from scipy.stats.qmc import Halton
+from shapely.geometry import Polygon
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import *
 from swarm_prm.envs.instance import Instance
@@ -21,6 +22,7 @@ class GaussianPRM:
                  mc_threshold=0.02,
                  safety_radius=2,
                  swarm_prm_covariance_scaling=5,
+                 cvt_iteration=10
                  ) -> None:
 
         # PARAMETERS
@@ -30,7 +32,6 @@ class GaussianPRM:
         self.goals = self.instance.goals
         self.starts_weight = self.instance.starts_weight
         self.goals_weight = self.instance.goals_weight
-
 
         self.num_samples = num_samples
         self.alpha = alpha
@@ -42,6 +43,9 @@ class GaussianPRM:
 
         # SwarmPRM Sampling strategy
         self.swarm_prm_covariance_scalling= swarm_prm_covariance_scaling
+
+        # CVT Map construction strategy
+        self.cvt_iteration = cvt_iteration
 
         # Map related 
         self.samples = []
@@ -78,8 +82,41 @@ class GaussianPRM:
         """
             Iteratively update roadmap using CVT optimization
         """
+        def cvt_compute_centroids(vor, points, bounding_polygon, obstacles):
+            """
+                Compute centroids of Voronoi regions
+            """
+            new_points = []
+            for point, region_index in zip(points, vor.point_region):
+                region = vor.regions[region_index]
+                if not region or -1 in region:
+                    new_points.append(point)  # Keep original point for infinite regions
+                    continue
         
+                # Create a polygon for the Voronoi cell
+                region_vertices = [vor.vertices[i] for i in region]
+                cell_polygon = Polygon(region_vertices)
 
+                # If the region intersects with any obstacle, keep the original point
+                if any(cell_polygon.intersects(obs) for obs in obstacles):
+                    new_points.append(point)
+                else:
+                    # Calculate the centroid of the cell
+                    if cell_polygon.is_valid and not cell_polygon.is_empty:
+                        centroid = cell_polygon.centroid
+                        # Ensure the centroid is inside the bounding polygon
+                        if bounding_polygon.contains(centroid):
+                            new_points.append(centroid.coords[0])
+                        else:
+                            # If centroid is outside, keep the original point
+                            # Alternatively, you could project it back onto the bounding polygon boundary
+                            closest_point = bounding_polygon.exterior.interpolate(bounding_polygon.exterior.project(centroid))
+                            new_points.append(closest_point.coords[0])
+                    else:
+                        new_points.append(point)  # Fallback to original point if invalid
+
+                return np.array(new_points)
+    
     def sample_free_space(self, sampling_strategy="UNIFORM", collision_check_method="CVAR"):
         """
             Sample points on the map uniformly random
@@ -165,12 +202,6 @@ class GaussianPRM:
                     self.samples.append(mean)
                     self.gaussian_nodes.append(g_node)
 
-        elif sampling_strategy == "CVT":
-            """
-                Iteratively update Voronoi region as sample points
-                TODO: implement this
-            """
-            pass
 
         elif sampling_strategy == "GAUSSIAN":
             assert False, "Unimplemented Gaussian sampling strategy"
