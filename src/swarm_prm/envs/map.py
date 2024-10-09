@@ -230,12 +230,32 @@ class Obstacle:
             return pts, segs, self.get_pos()
 
         elif self.obs_type == "POLYGON":
-            """
-                
-            """
-        
-            pass
-    
+            def _split_edge(edge, segment_length):
+                """Split a LineString edge into segments of specified length."""
+                segments = []
+                num_segments = int(edge.length // segment_length)
+
+                # Create each segment
+                for i in range(num_segments):
+                    start_point = edge.interpolate(i * segment_length)
+                    end_point = edge.interpolate((i + 1) * segment_length)
+                    segment = LineString([start_point, end_point])
+                    segments.append(segment)
+
+                # Add the remainder segment to the endpoint if necessary
+                if edge.length % segment_length != 0:
+                    last_segment = LineString([end_point, edge.interpolate(edge.length)])
+                    segments.append(last_segment)
+
+                return segments
+
+            # Extract and split each edge of the polygon
+            all_segments = []
+            for i in range(len(self.geom.exterior.coords) - 1):
+                # Each edge of the polygon as a LineString
+                edge = LineString([self.geom.exterior.coords[i], self.geom.exterior.coords[i + 1]])
+                edge_segments = _split_edge(edge, self.segment_length)
+                all_segments.extend(edge_segments)          
 
     def is_point_colliding(self, point):
         """
