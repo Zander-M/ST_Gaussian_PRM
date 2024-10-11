@@ -182,7 +182,7 @@ class Obstacle:
         Obstacles on the map
     """
 
-    def __init__(self, pos, obs_type, *args, segment_length=2):
+    def __init__(self, pos, obs_type, *args):
         """
             Obstacle base class
             For Circle obstacle, pass in radius as args
@@ -199,7 +199,6 @@ class Obstacle:
             self.pos = np.array([self.geom.centroid.x, self.geom.centroid.y])
         else:
             assert False, "Obstacle must be either circle or polygon."
-        self.segment_length = segment_length
 
     def get_pos(self):
         """
@@ -214,13 +213,13 @@ class Obstacle:
         point_geom = Point(point)
         return point_geom.distance(self.geom)
 
-    def get_edge_segments(self):
+    def get_edge_segments(self, segment_length=2):
         """
             Get edge segments for delaunay triangulation
             Return: points, segmetns, pos 
         """
         if self.obs_type == "CIRCLE":
-            n_points = 2 * self.radius * np.pi // self.segment_length
+            n_points = int(2 * self.radius * np.pi // segment_length)
 
             # calculate points on the circle
             i = np.arange(n_points)
@@ -232,30 +231,30 @@ class Obstacle:
         elif self.obs_type == "POLYGON":
             def _split_edge(edge, segment_length):
                 """Split a LineString edge into segments of specified length."""
-                segments = []
+                pts = []
                 num_segments = int(edge.length // segment_length)
 
                 # Create each segment
-                for i in range(num_segments):
-                    start_point = edge.interpolate(i * segment_length)
-                    end_point = edge.interpolate((i + 1) * segment_length)
-                    segment = LineString([start_point, end_point])
-                    segments.append(segment)
+                for i in range(num_segments+1):
+                    pts.append(np.array(edge.interpolate(i * segment_length).xy).reshape(2))
 
-                # Add the remainder segment to the endpoint if necessary
-                if edge.length % segment_length != 0:
-                    last_segment = LineString([end_point, edge.interpolate(edge.length)])
-                    segments.append(last_segment)
-
-                return segments
+                return pts
+            all_pts = []
 
             # Extract and split each edge of the polygon
             all_segments = []
             for i in range(len(self.geom.exterior.coords) - 1):
                 # Each edge of the polygon as a LineString
                 edge = LineString([self.geom.exterior.coords[i], self.geom.exterior.coords[i + 1]])
-                edge_segments = _split_edge(edge, self.segment_length)
-                all_segments.extend(edge_segments)          
+                pts = _split_edge(edge, segment_length)
+                all_pts.extend(pts)          
+
+            idx = np.arange(len(all_pts))
+            segs = np.stack([idx, idx+1], axis=1) % len(all_pts)
+
+            return np.array(all_pts), segs, self.get_pos()
+        else: 
+            assert False, "Unimplemented obstacle type."
 
     def is_point_colliding(self, point):
         """
