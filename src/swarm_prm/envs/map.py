@@ -242,7 +242,6 @@ class Obstacle:
             all_pts = []
 
             # Extract and split each edge of the polygon
-            all_segments = []
             for i in range(len(self.geom.exterior.coords) - 1):
                 # Each edge of the polygon as a LineString
                 edge = LineString([self.geom.exterior.coords[i], self.geom.exterior.coords[i + 1]])
