@@ -229,13 +229,16 @@ class Obstacle:
             return pts, segs, self.get_pos()
 
         elif self.obs_type == "POLYGON":
+
             def _split_edge(edge, segment_length):
                 """Split a LineString edge into segments of specified length."""
                 pts = []
-                num_segments = int(edge.length // segment_length)
 
+                num_segments = int(edge.length // segment_length)
+                if edge.length % segment_length != 0:
+                    num_segments += 1
                 # Create each segment
-                for i in range(num_segments+1):
+                for i in range(num_segments):
                     pts.append(np.array(edge.interpolate(i * segment_length).xy).reshape(2))
 
                 return pts
@@ -249,6 +252,7 @@ class Obstacle:
                 all_pts.extend(pts)          
 
             idx = np.arange(len(all_pts))
+
             segs = np.stack([idx, idx+1], axis=1) % len(all_pts)
 
             return np.array(all_pts), segs, self.get_pos()
