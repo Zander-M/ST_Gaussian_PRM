@@ -155,6 +155,22 @@ class Map:
             return False
         else: 
             assert False, "Unimplemented Collision Checking Method"
+    
+    def is_geometry_collision(self, geom):
+        """
+            Check if Geometry collides with the obstacles on the map
+        """
+        if geom.centroid.xy[0][0] < 0 or geom.centroid.xy[0][0] > self.width:
+            return True
+
+        if geom.centroid.xy[1][0] < 0 or geom.centroid.xy[1][0] > self.height:
+            return True
+
+        # obstacle check
+        for obs in self.obstacles:
+            if obs.is_geometry_colliding(geom):
+                return True
+        return False
 
     def visualize(self, fig=None, ax=None):
         """
@@ -290,6 +306,12 @@ class Obstacle:
         ita = norm(mean, variance)
         cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance # type: ignore
         return cvar > threshold
+    
+    def is_geometry_colliding(self, geom):
+        """
+            check if provided geometry 
+        """
+        return self.geom.intersects(geom)
 
 ##### Map Generator #####
 

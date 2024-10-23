@@ -7,7 +7,7 @@ from matplotlib.patches import Circle
 import numpy as np
 from scipy.spatial import KDTree, Delaunay, Voronoi
 from scipy.stats.qmc import Halton
-from shapely.geometry import Polygon
+from shapely.geometry import Point, Polygon
 import triangle as tr
 
 from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import *
@@ -23,7 +23,8 @@ class GaussianPRM:
                  mc_threshold=0.02,
                  safety_radius=2,
                  swarm_prm_covariance_scaling=5,
-                 cvt_iteration=10
+                 cvt_iteration=10,
+                 hex_radius=2
                  ) -> None:
 
         # PARAMETERS
@@ -47,6 +48,9 @@ class GaussianPRM:
 
         # CVT Map construction strategy
         self.cvt_iteration = cvt_iteration
+
+        # Hexagon Map construction
+        self.hex_radius = hex_radius
 
         # Map related 
         self.samples = []
@@ -79,45 +83,6 @@ class GaussianPRM:
         self.load_instance() # adding problem instance nodes to roadmap
         self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
 
-    def cvt_roadmap_construction(self):
-        """
-            Iteratively update roadmap using CVT optimization
-        """
-        def cvt_compute_centroids(vor, points, bounding_polygon, obstacles):
-            """
-                Compute centroids of Voronoi regions
-            """
-            new_points = []
-            for point, region_index in zip(points, vor.point_region):
-                region = vor.regions[region_index]
-                if not region or -1 in region:
-                    new_points.append(point)  # Keep original point for infinite regions
-                    continue
-        
-                # Create a polygon for the Voronoi cell
-                region_vertices = [vor.vertices[i] for i in region]
-                cell_polygon = Polygon(region_vertices)
-
-                # If the region intersects with any obstacle, keep the original point
-                if any(cell_polygon.intersects(obs) for obs in obstacles):
-                    new_points.append(point)
-                else:
-                    # Calculate the centroid of the cell
-                    if cell_polygon.is_valid and not cell_polygon.is_empty:
-                        centroid = cell_polygon.centroid
-                        # Ensure the centroid is inside the bounding polygon
-                        if bounding_polygon.contains(centroid):
-                            new_points.append(centroid.coords[0])
-                        else:
-                            # If centroid is outside, keep the original point
-                            # Alternatively, you could project it back onto the bounding polygon boundary
-                            closest_point = bounding_polygon.exterior.interpolate(bounding_polygon.exterior.project(centroid))
-                            new_points.append(closest_point.coords[0])
-                    else:
-                        new_points.append(point)  # Fallback to original point if invalid
-
-                return np.array(new_points)
-    
     def sample_free_space(self, sampling_strategy="UNIFORM", collision_check_method="CVAR"):
         """
             Sample points on the map uniformly random
@@ -224,6 +189,50 @@ class GaussianPRM:
                     self.samples.append(mean)
                     self.gaussian_nodes.append(g_node)
 
+        elif sampling_strategy == "CVT":
+            """
+                Use CVT to find centroids for each Voronoi cell. Choose the 
+                largest circle that fits in each cell to set the Gaussian mean
+                and covariance.
+            """
+        
+        elif sampling_strategy == "HEXAGON":
+            """
+                Hexagonal map construction
+            """
+
+            # Function to create a hexagon centered at (x, y) with a given size (radius)
+            def create_hexagon(center_x, center_y, size):
+                return Polygon([(center_x + size * np.cos(2 * np.pi * i / 6), 
+                                 center_y + size * np.sin(2 * np.pi * i / 6)) for i in range(6)])
+
+            # Square map boundary
+            map_boundary = Polygon([(0, 0), 
+                                    (0, self.map.height), 
+                                    (self.map.width, self.map.height), 
+                                    (self.map.width, 0)])  
+
+            hex_width = self.hex_radius * 2  # Distance between two horizontal vertices of a hexagon
+            hex_height = np.sqrt(3) * self.hex_radius# Vertical distance between hexagon vertices
+
+            # Create hexagonal grid points, reject points 
+            grid_points = []
+            for i in range(0, self.map.width):  # Adjust range based on map size and hex size
+                for j in range(0, self.map.height):
+                    x_offset = i * hex_width * 3 / 4  # Horizontal spacing
+                    y_offset = j * hex_height + (i % 2) * (hex_height / 2)  # Offset every other row
+                    hex_center = Point(x_offset, y_offset)
+                    if map_boundary.contains(hex_center):
+                        grid_points.append((x_offset, y_offset))
+
+            for x, y in grid_points:
+                hexagon = create_hexagon(x, y, self.hex_radius)
+                if not self.map.is_geometry_collision(hexagon):
+                    node = np.array((x, y))
+                    self.samples.append(node)
+                    g_node = GaussianGraphNode(node, None, type="UNIFORM", 
+                                               radius=self.hex_radius)
+                    self.gaussian_nodes.append(g_node)
 
         elif sampling_strategy == "GAUSSIAN":
             assert False, "Unimplemented Gaussian sampling strategy"
@@ -335,6 +344,13 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
+    def get_macro_solution(self, flow_dict, timestep, num_agent):
+        """
+            Get macro solution containing goals and number of agent at each
+            timestep.
+        """
+        pass
+        
     def get_solution(self, flow_dict, timestep, num_agent):
         """
             Return macro solution path per agent

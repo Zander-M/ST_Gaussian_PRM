@@ -84,13 +84,12 @@ class GaussianGraphNode(GaussianNode):
     """
         Gaussian Node
     """
-
-    def __init__(self, mean, covariance, type="RANDOM", alpha=.99, radius=None) -> None:
+    def __init__(self, mean, covariance, type="RANDOM", radius=0, alpha=.99, ) -> None:
 
         self.type = type
         if self.type == "UNIFORM":
             super().__init__(mean, np.identity(2))
-            assert radius is not None, "Radius is required for Uniform Gaussian initialization"
+            assert radius > 0, "Radius is required for Uniform Gaussian initialization"
             self.radius = radius
             self.alpha = alpha
             self.set_covariance()
@@ -155,13 +154,13 @@ class GaussianMixture:
         self.means = means 
         self.covs = covs
         self.weights = weights
-        self.count = len(self.norms)
+        self.count = len(self.means)
     
     def get_gaussians(self):
-        return zip(self.norms, self.covs)
+        return zip(self.means, self.covs)
     
     def __len__(self):
-        return len(self.norms)
+        return len(self.means)
     
     @staticmethod
     def compute_distance(gmm_1, gmm_2):
