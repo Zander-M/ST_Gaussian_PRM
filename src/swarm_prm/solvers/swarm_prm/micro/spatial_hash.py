@@ -19,6 +19,7 @@ class SpatialHash:
         """
             Get grid index
         """
+        assert position[0] is not np.nan and position[1] is not np.nan, print(position)
         cell_x = math.floor(position[0] / self.grid_size)
         cell_y = math.floor(position[1] / self.grid_size)
         return (cell_x, cell_y)

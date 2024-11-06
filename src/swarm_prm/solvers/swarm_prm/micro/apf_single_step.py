@@ -80,7 +80,7 @@ class APFSingleStepSolver:
 
         reach_timestep_goal = [False] * self.num_agent
         timestep_iter = 0
-        while False in reach_timestep_goal \
+        while not all (reach_timestep_goal) \
             and timestep_iter < self.max_timestep_iter * self.num_agent:
             for agent_idx in order:
                 f_att = self.get_f_att(agent_idx, timestep)
@@ -90,7 +90,7 @@ class APFSingleStepSolver:
                 new_pos = self.solution_trajectory[agent_idx][-1] + f_total * self.step_size 
                 if self.roadmap.is_radius_collision(new_pos, self.agent_radius):
                     new_pos = self.solution_trajectory[agent_idx][-1] # wait if new position collide with obstacle
-
+                                                                      # FIXIT: keep componet perpendicular to the obstacle norm
                 # Test reach condition
                 if np.linalg.norm(self.macro_trajectory[agent_idx][timestep] - new_pos) < self.reach_dist:
                     reach_timestep_goal[agent_idx] = True
