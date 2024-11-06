@@ -191,6 +191,12 @@ class Map:
         ax.set_aspect('equal')
         return fig, ax
 
+    def get_openfoam_config(self):
+        """
+            Convert current map to openfoam initial conditions
+        """
+        pass
+
 ##### Obstacles #####
 
 class Obstacle:

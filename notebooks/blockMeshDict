@@ -1,0 +1,37 @@
+FoamFile
+{
+    version    2.0;
+    format     ascii;
+    class      dictionary;
+    object     blockMeshDict;
+}
+
+vertices
+(
+    (0.0 0.0) // Vertex 0
+    (1.0 0.0) // Vertex 1
+    (1.0 1.0) // Vertex 2
+    (0.0 1.0) // Vertex 3
+    (0.0 0.0) // Vertex 4
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (10 10 10) simpleGrading (1 1 1)
+);
+
+boundary
+(
+    boundary0
+    {
+        type wall;
+        faces
+        (
+            ( 0 1 2 3 4 )
+        );
+    }
+);
+
+mergePatchPairs
+(
+);

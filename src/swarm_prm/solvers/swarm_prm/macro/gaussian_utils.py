@@ -84,7 +84,7 @@ class GaussianGraphNode(GaussianNode):
     """
         Gaussian Node
     """
-    def __init__(self, mean, covariance, type="RANDOM", radius=0, alpha=.99, ) -> None:
+    def __init__(self, mean, covariance, type="RANDOM", radius=0., alpha=.99, ) -> None:
 
         self.type = type
         if self.type == "UNIFORM":

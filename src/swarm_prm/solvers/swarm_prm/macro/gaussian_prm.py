@@ -1,6 +1,8 @@
 """
     Gaussian PRM based on map info.
 """
+from collections import defaultdict 
+
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
@@ -344,12 +346,32 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
-    def get_macro_solution(self, flow_dict, timestep, num_agent):
+    def get_macro_solution(self, flow_dict):
         """
             Get macro solution containing goals and number of agent at each
             timestep.
         """
-        pass
+        macro_solution =  {}
+        open = list(flow_dict["SS"].keys())
+        while len(open) > 0:
+            in_node = open.pop(0)
+            if in_node == "SG":
+                break
+            for out_node in flow_dict[in_node].keys():
+                if out_node == "SG":
+                    open.append(out_node)
+                    continue
+
+                if flow_dict[in_node][out_node] > 0:
+                    open.append(out_node)
+                    u, _  = in_node.split("_")
+                    v, t = out_node.split("_")
+                    if t not in macro_solution:
+                        macro_solution[t] = {}
+                    if u not in macro_solution[t]:
+                        macro_solution[t][u] = []
+                    macro_solution[t][u].append((v, flow_dict[in_node][out_node]))
+        return macro_solution
         
     def get_solution(self, flow_dict, timestep, num_agent):
         """
