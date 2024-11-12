@@ -46,6 +46,12 @@ class APFSingleStepSolver:
         self.solution_length = 0
         self.spatial_hash = SpatialHash(self.hash_grid_size)
         
+        self.initailize_starts()
+
+    def initailize_starts(self):
+        """
+            Initialize agent locations based on start locations
+        """
         # adding starting positions with noise
         points = []
         for agent_idx in range(self.num_agent):
@@ -59,7 +65,7 @@ class APFSingleStepSolver:
                 if all(np.linalg.norm(pt-np.array(p)) >= self.obs_thresh for p in points):
                     self.solution_trajectory.append([pt])
                     points.append(pt)
-                    self.spatial_hash.insert(agent_idx, pt) 
+                    self.spatial_hash.insert(agent_idx, pt)
                     break
 
     def update(self, timestep):

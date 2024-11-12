@@ -45,7 +45,14 @@ class APFOnlineSolver:
         self.solution_trajectory = []
         self.solution_length = 0
         self.spatial_hash = SpatialHash(self.hash_grid_size)
+
+        self.initailize_starts()
         
+
+    def initailize_starts(self):
+        """
+            Initialize agent locations based on start locations
+        """
         # adding starting positions with noise
         points = []
         for agent_idx in range(self.num_agent):
