@@ -2,7 +2,6 @@
     Spatial Hash for quick neighbour lookup
 """
 from collections import defaultdict
-import math
 
 import numpy as np
 
@@ -20,8 +19,8 @@ class SpatialHash:
             Get grid index
         """
         assert position[0] is not np.nan and position[1] is not np.nan, print(position)
-        cell_x = math.floor(position[0] / self.grid_size)
-        cell_y = math.floor(position[1] / self.grid_size)
+        cell_x = np.floor(position[0] / self.grid_size)
+        cell_y = np.floor(position[1] / self.grid_size)
         return (cell_x, cell_y)
 
     def insert(self, agent_id, position):
@@ -69,7 +68,7 @@ class SpatialHash:
         cell_x, cell_y = self._hash(position)
         nearby_agents= []
 
-        search_radius = math.ceil(radius / self.grid_size)
+        search_radius = int(np.ceil(radius / self.grid_size))
         
         for dx in range(-search_radius, search_radius+1):
             for dy in range(-search_radius, search_radius+1):

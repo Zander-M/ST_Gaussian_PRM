@@ -18,7 +18,7 @@ class APFOnlineSolver:
         Decide which goal to go for each agent online
     """
     def __init__(self, roadmap, macro_solution, agent_radius, macro_timestep, 
-                 step_size=0.1, obs_thresh=1, max_dist=10,
+                 step_size=0.1, obs_thresh=1, max_dist=10, 
                  attract_coeff=0.2, repel_coeff=0.5, agent_repel_coeff=0.5,  
                  max_timestep_iter=100, reach_dist=3,
                  hash_grid_size = 3,
@@ -35,6 +35,8 @@ class APFOnlineSolver:
         self.hash_grid_size = hash_grid_size
         
         # APF parameters 
+
+        self.max_init_attempt = 1000
         self.step_size = step_size # step size
         self.attract_coeff = attract_coeff
         self.repel_coeff = repel_coeff
@@ -47,7 +49,6 @@ class APFOnlineSolver:
         self.spatial_hash = SpatialHash(self.hash_grid_size)
 
         self.initailize_starts()
-        
 
     def initailize_starts(self):
         """
@@ -56,7 +57,8 @@ class APFOnlineSolver:
         # adding starting positions with noise
         points = []
         for agent_idx in range(self.num_agent):
-            while True:
+            init_attempt = 0
+            while init_attempt < self.max_init_attempt:
                 r = np.random.uniform(self.obs_thresh, self.max_dist)
                 theta = np.random.uniform(0, 2 * np.pi)
 
@@ -68,6 +70,9 @@ class APFOnlineSolver:
                     points.append(pt)
                     self.spatial_hash.insert(agent_idx, pt)
                     break
+                init_attempt += 1
+            if init_attempt == self.max_init_attempt:
+                assert False, "Cannot find valid initial configuration."
 
     def update(self, timestep):
         """

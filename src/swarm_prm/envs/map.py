@@ -2,7 +2,6 @@
     Roadmap objects
 """
 
-from abc import abstractmethod
 from matplotlib import pyplot as plt
 from matplotlib.patches import Circle
 import numpy as np
@@ -43,6 +42,13 @@ class Map:
         for obs in self.obstacles:
             clear_radius = min(clear_radius, obs.get_dist(point))
         return clear_radius
+    
+    def get_closest_obstacle(self, point):
+        """
+            Return the closest obstacle from the point. 
+        """
+        dist = [obs.get_dist(point) for obs in self.obstacles]
+        return self.obstacles[np.argsort(dist)[0]]
 
     def get_obstacles(self):
         """
@@ -193,7 +199,7 @@ class Map:
 
     def get_openfoam_config(self):
         """
-            Convert current map to openfoam initial conditions
+            TODO: Convert current map to openfoam initial conditions
         """
         pass
 
