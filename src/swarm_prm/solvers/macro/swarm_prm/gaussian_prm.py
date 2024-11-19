@@ -23,7 +23,7 @@ class GaussianPRM:
     def __init__(self, instance:Instance, num_samples, 
                  alpha=0.95, cvar_threshold=-8,
                  mc_threshold=0.02,
-                 safety_radius=2,
+                 safety_radius=2.0,
                  swarm_prm_covariance_scaling=5,
                  cvt_iteration=10,
                  hex_radius=2
