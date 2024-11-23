@@ -49,7 +49,7 @@ class CBS_NX:
 
     def construct_constraints(self, ct, timestep):
         """
-            Construct constriants at timestep
+            Construct constraints at timestep
         """
 
     def plan(self, ct):
