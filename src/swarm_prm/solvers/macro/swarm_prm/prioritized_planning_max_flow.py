@@ -1,18 +1,12 @@
 """
     Prioritized Planning for Gaussian PRM
 """
-
 import numpy as np
-import matplotlib.pyplot as plt
-
-import heapq
-
-from swarm_prm.solvers.macro.swarm_prm.gaussian_prm import GaussianPRM
-
 
 from collections import defaultdict
-from matplotlib import pyplot as plt
-import networkx as nx
+from pprint import pprint
+import heapq
+
 from swarm_prm.solvers.macro.swarm_prm.gaussian_prm import GaussianPRM
 
 class AbstractGraph:
@@ -27,8 +21,8 @@ class AbstractGraph:
         self.nodes_idx = [i for i in range(len(self.nodes))]
 
         self.nodes = self.gaussian_prm.samples 
-        self.starts_idx = self.gaussian_prm.starts_idx
-        self.goals_idx = self.gaussian_prm.goals_idx
+        self.starts_idx = np.array(self.gaussian_prm.starts_idx)
+        self.goals_idx = np.array(self.gaussian_prm.goals_idx)
         self.graph = self._build_graph()
         self.heuristic = self._compute_heuristic()
         self.constraints = constraints
@@ -59,7 +53,7 @@ class AbstractGraph:
 
         # no capacity limit at starts and goals
         for start_idx in self.starts_idx:
-            graph[start_idx].append((start_idx, np.inf))
+            graph[start_idx].append((start_idx, float("inf"))) 
 
         # capacity for wait at intermediate nodes
         for idx in self.nodes_idx:
@@ -89,7 +83,7 @@ class AbstractGraph:
         capacity_dict = {}
         for idx in self.nodes_idx:
             if idx in self.starts_idx:
-                capacity_dict[idx] = np.inf
+                capacity_dict[idx] = float("inf")
             else:
                 capacity_dict[idx] = self.gaussian_prm.gaussian_nodes[idx].get_capacity(self.agent_radius)
         return capacity_dict
@@ -107,7 +101,7 @@ class AbstractGraph:
         """
             Get path flow based on graph
         """
-        max_flow = np.inf
+        max_flow = float("inf")
         for t, node in enumerate(path):
             max_flow = min(max_flow, self.get_node_capacity(node, t))
         return max_flow
@@ -118,11 +112,12 @@ class AbstractGraph:
         """
         return [node[0] for node in self.graph[node_idx]]
         
+        
     def _compute_heuristic(self):
         """
             Multi-source single goal from the goal locations
         """
-        heuristic = defaultdict(lambda:np.inf)
+        heuristic = defaultdict(lambda:float("inf"))
         for goal_idx in self.goals_idx:
             h = self._bfs(goal_idx)
             for node_idx in h:
@@ -151,7 +146,7 @@ class STAStar:
 
     """
 
-    def __init__(self, nodes, graph:AbstractGraph, constraints=defaultdict(list)):
+    def __init__(self, nodes, graph:AbstractGraph, constraints=defaultdict(dict)):
         """
             nodes:
                 Node indexes
@@ -167,10 +162,8 @@ class STAStar:
         self.nodes = nodes
         self.graph = graph
         self.constraints = constraints 
-        self.ss = len(self.graph.nodes)
-        self.sg = len(self.graph.nodes) + 1
 
-    def search(self):
+    def search(self, start):
         """
             A Star search
         """
@@ -178,27 +171,23 @@ class STAStar:
         visited = {}
         e_count = 0 # tie-breaking for heapq
 
-        # Add starts
-        actions = []
-        for start_idx in self.graph.starts_idx:
-            actions.append([None, start_idx])
+        # Add start
+        start_idx = self.graph.starts_idx[start]
 
-        constrained_actions = self.apply_constraints(actions, 0)
-        curr_state_dict = {}
-        for _, start_idx in constrained_actions:
-            curr_state_dict = {
-                "t": 0,
-                "parent": None,
-                "node_idx": start_idx
-            }
-            f_value = self.graph.get_heuristic(start_idx)
-            heapq.heappush(open_heap, (f_value, e_count, curr_state_dict))
-            e_count += 1
+        curr_state_dict = {
+            "t": 0,
+            "parent": None,
+            "node_idx": start_idx
+        }
+        f_value = self.graph.get_heuristic(start_idx)
+        heapq.heappush(open_heap, (f_value, e_count, curr_state_dict))
+        e_count += 1
 
         while open_heap:
             # pop from open list, take one step and add new node to open list
             _, _, curr_state_dict =heapq.heappop(open_heap)
             curr_node_idx = curr_state_dict["node_idx"]
+            visited[(curr_state_dict["node_idx"], curr_state_dict["t"])] = 0 
 
             # if reaching one of the goals, 
             if self.goal_test(curr_node_idx):
@@ -206,9 +195,11 @@ class STAStar:
 
             # all neighboring nodes + wait
             next_nodes = self.graph.get_neighbors(curr_node_idx) + [curr_node_idx]
-            actions = [[curr_node_idx, next_node] for next_node in next_nodes]
-            constrained_actions = self.apply_constraints(actions, curr_state_dict["t"])
-            for action in constrained_actions:
+            actions = [(curr_node_idx, next_node) for next_node in next_nodes \
+                if not self.is_constrained((curr_node_idx, next_node), curr_state_dict["t"]) \
+                    and (next_node, curr_state_dict["t"]) not in visited]
+            
+            for action in actions:
                 state_dict = {
                     "t" : curr_state_dict["t"] + 1,
                     "parent" : curr_state_dict,
@@ -224,10 +215,11 @@ class STAStar:
         while curr_state_dict["parent"] is not None:
             path.append(curr_state_dict["node_idx"])
             curr_state_dict = curr_state_dict["parent"]
+        path.append(curr_state_dict["node_idx"])
         return path[::-1]
 
     
-    def apply_constraints(self, actions, timestep):
+    def is_constrained(self, action, timestep):
         """
             return valid actions that respects the constraints
 
@@ -237,17 +229,7 @@ class STAStar:
             timestep:
                 Timestep of of the action
         """
-        t_constraints = self.get_constraint_at_timestep(timestep)
-        return [action for action in actions if action[1] not in t_constraints[action[0]]]
-    
-    def get_constraint_at_timestep(self, timestep):
-        """
-            return constraints indexed by node idx at timestep t
-        """
-        t_constraints = defaultdict(list)
-        for constraint in self.constraints[timestep]:
-            t_constraints[constraint[0]].append(constraint[1])
-        return t_constraints
+        return action in self.constraints[timestep]
 
     def goal_test(self, node_idx):
         """
@@ -271,23 +253,33 @@ class PrioritizedPlanningMaxFlow:
             Solve for agent trajectories
         """
         curr_flow = 0
-        constraints = defaultdict(list)
+        constraints = defaultdict(dict)
         paths = []
+
+        # compute number of agents at starts
+        starts_flow = []
+        for i in range(len(self.gaussian_prm.starts_idx)):
+           starts_flow.append(int(self.target_flow * self.gaussian_prm.starts_weight[i])) 
+        
         while curr_flow < self.target_flow:
-            path = STAStar(self.nodes, self.graph, constraints).search()
+
+            # Choose start nodes with positive weight
+            start = -1
+            for i, source_flow in enumerate(starts_flow):
+                if source_flow > 0:
+                    start = i
+                
+            path = STAStar(self.nodes, self.graph, constraints).search(start)
             flow = self.graph.get_path_flow(path)
 
             # update flow dict
             self.graph.update_flow(path, flow)
-
             curr_flow += flow
 
             paths.append((path, flow))
-            constraints = self.update_constraints(constraints, path, flow)
-            print("current flow:", curr_flow)
+            constraints = self.update_constraints(constraints, path)
 
-
-    def update_constraints(self, constraints, path, flow):
+    def update_constraints(self, constraints, path):
         """
             Convert Path to constraints
 
@@ -301,18 +293,19 @@ class PrioritizedPlanningMaxFlow:
             {t:[(v1, v2), ...]...}
         """
         # Edge Constraints
+        print("Edge Constraints")
         for t, (u, v) in enumerate(zip(path[:-1], path[1:])):
             if (v, u) not in constraints[t]:
-                constraints[t].append((v, u))
+                constraints[t][(v, u)] = ""
 
         # Capacity Constraints
+        print("Capacity Constraints")
         # Forbid agents to enter node that is full
         for t, node in enumerate(path):
             if self.graph.get_node_capacity(node, t) == 0:
                 neighbors = self.graph.get_neighbors(node)
                 for neighbor in neighbors:
-                    constraints[t].append((neighbor, node))
-
+                    constraints[t][(neighbor, node)] = ""
         return constraints
 
 
