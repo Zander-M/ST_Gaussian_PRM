@@ -58,7 +58,7 @@ class AbstractGraph:
         # capacity for wait at intermediate nodes
         for idx in self.nodes_idx:
             if idx not in self.starts_idx and idx not in self.goals_idx:
-                graph[idx].append((idx, self.gaussian_prm.gaussian_nodes[idx].get_capacity(self.agent_radius)))
+                graph[idx].append((np.int32(idx), self.gaussian_prm.gaussian_nodes[idx].get_capacity(self.agent_radius)))
 
         # use the capacity of the smaller node as the edge capacity
         for edge in self.gaussian_prm.roadmap:
@@ -193,8 +193,8 @@ class STAStar:
             if self.goal_test(curr_node_idx):
                 break
 
-            # all neighboring nodes + wait
-            next_nodes = self.graph.get_neighbors(curr_node_idx) + [curr_node_idx]
+            # all neighboring nodes 
+            next_nodes = self.graph.get_neighbors(curr_node_idx) 
             actions = [(curr_node_idx, next_node) for next_node in next_nodes \
                 if not self.is_constrained((curr_node_idx, next_node), curr_state_dict["t"]) \
                     and (next_node, curr_state_dict["t"]) not in visited]
@@ -263,7 +263,7 @@ class PrioritizedPlanningMaxFlow:
         
         while curr_flow < self.target_flow:
 
-            # Choose start nodes with positive weight
+            # Choose start nodes with positive capacity
             start = -1
             for i, source_flow in enumerate(starts_flow):
                 if source_flow > 0:
@@ -271,13 +271,17 @@ class PrioritizedPlanningMaxFlow:
                 
             path = STAStar(self.nodes, self.graph, constraints).search(start)
             flow = self.graph.get_path_flow(path)
+            flow = min(starts_flow[start], flow)
 
             # update flow dict
-            self.graph.update_flow(path, flow)
-            curr_flow += flow
 
-            paths.append((path, flow))
+            self.graph.update_flow(path, flow)
             constraints = self.update_constraints(constraints, path)
+            paths.append((path, flow))
+            curr_flow += flow
+            starts_flow[start] -= flow
+
+        return paths
 
     def update_constraints(self, constraints, path):
         """
@@ -293,19 +297,18 @@ class PrioritizedPlanningMaxFlow:
             {t:[(v1, v2), ...]...}
         """
         # Edge Constraints
-        print("Edge Constraints")
         for t, (u, v) in enumerate(zip(path[:-1], path[1:])):
             if (v, u) not in constraints[t]:
                 constraints[t][(v, u)] = ""
 
         # Capacity Constraints
-        print("Capacity Constraints")
         # Forbid agents to enter node that is full
         for t, node in enumerate(path):
             if self.graph.get_node_capacity(node, t) == 0:
                 neighbors = self.graph.get_neighbors(node)
                 for neighbor in neighbors:
-                    constraints[t][(neighbor, node)] = ""
+                    constraints[t-1][(neighbor, node)] = ""
+
         return constraints
 
 
