@@ -10,8 +10,8 @@ from scipy.optimize import linear_sum_assignment
 from shapely.geometry import Point
 from shapely.ops import nearest_points
 
-from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import GaussianNode
-from swarm_prm.solvers.swarm_prm.micro.spatial_hash import SpatialHash
+from swarm_prm.solvers.macro.swarm_teg.gaussian_utils import GaussianNode
+from swarm_prm.solvers.micro.spatial_hash import SpatialHash
 
 class APFOnlineSolver:
     """

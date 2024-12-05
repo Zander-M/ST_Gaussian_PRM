@@ -3,9 +3,9 @@
 """
 from collections import defaultdict
 
-from swarm_prm.solvers.macro.swarm_prm.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.swarm_prm.abstract_graph import AbstractGraph 
-from swarm_prm.solvers.macro.swarm_prm.stastar import STAStar
+from swarm_prm.solvers.macro.swarm_teg.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.swarm_teg.abstract_graph import AbstractGraph 
+from swarm_prm.solvers.macro.swarm_teg.stastar import STAStar
 
 class PrioritizedPlanningMaxFlow:
     """
@@ -78,7 +78,6 @@ class PrioritizedPlanningMaxFlow:
                 neighbors = self.graph.get_neighbors(node)
                 for neighbor in neighbors:
                     constraints[t-1][(neighbor, node)] = ""
-
         return constraints
 
 

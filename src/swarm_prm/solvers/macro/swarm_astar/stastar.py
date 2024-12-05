@@ -4,7 +4,7 @@
 from collections import defaultdict
 import heapq
 
-from swarm_prm.solvers.macro.swarm_prm.abstract_graph import AbstractGraph
+from swarm_prm.solvers.macro.swarm_teg.abstract_graph import AbstractGraph
 
 
 class STAStar:

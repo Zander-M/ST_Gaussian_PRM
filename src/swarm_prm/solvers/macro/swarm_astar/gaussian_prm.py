@@ -12,7 +12,7 @@ from scipy.stats.qmc import Halton
 from shapely.geometry import Point, Polygon
 import triangle as tr
 
-from swarm_prm.solvers.macro.swarm_prm.gaussian_utils import *
+from swarm_prm.solvers.macro.swarm_teg.gaussian_utils import *
 from swarm_prm.envs.instance import Instance
 
 class GaussianPRM:

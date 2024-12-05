@@ -6,31 +6,10 @@
 from collections import defaultdict
 from matplotlib import pyplot as plt
 import networkx as nx
-from swarm_prm.solvers.macro.swarm_prm.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.swarm_max_flow.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.swarm_max_flow.max_flow import MaxFlowSolver
 
-class MaxFlowSolver:
-    """
-        Max Flow Solver that can reuse partial solutions.
-    """
-    def __init__(self, graph, flow, search_method="bfs") -> None:
-        """
-            Max flow on Abstract Graph 
-        """
-        self.graph = graph
-        self.flow = flow
-        
-    def _compute_heuristic(self):
-        """
-            Multi-source single goal from the goal locations
-        """
-        heuristic = defaultdict(lambda:float("inf"))
-        for goal_idx in self.goals_idx:
-            h = self._bfs(goal_idx)
-            for node_idx in h:
-                heuristic[node_idx] = min(heuristic[node_idx], h[node_idx])
-        return heuristic
-
-class TEGGraph_NX:
+class TEGGraph:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, target_flow, max_timestep=100) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
@@ -43,8 +22,7 @@ class TEGGraph_NX:
         """
             Build TEG based on timestep
         """
-        from networkx.algorithms.flow import shortest_augmenting_path
-        teg = nx.DiGraph()
+        teg = defaultdict(list)
         super_source = "SS"
         super_sink = "SG"
 
@@ -53,34 +31,31 @@ class TEGGraph_NX:
         # Visualization source and restricted_edges are hidden
         # duirng TEG visualization
 
-        vis_source = "VS" 
         restricted_edges  = []
-        for vis_idx in node_idx:
-            edge = (vis_source, '{}_{}'.format(vis_idx, 0))
-            teg.add_edge(edge[0], edge[1])
-            restricted_edges.append(edge)
 
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg.add_edge(super_source, '{}_{}'.format(start_idx, 0), 
-                         capacity=int(self.gaussian_prm.starts_weight[i]*self.target_flow))
+            teg[super_source].append((
+                        '{}_{}'.format(start_idx, 0), 
+                        int(self.gaussian_prm.starts_weight[i]*self.target_flow)
+                        ))
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg.add_edge('{}_{}'.format(goal_idx, timestep),super_sink,
-                         capacity=int(self.gaussian_prm.goals_weight[i]*self.target_flow))
+            teg['{}_{}'.format(goal_idx, timestep)].append((
+                        super_sink, 
+                        int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+                        ))
 
         for t in range(timestep):
-
             # adding wait edges
             for u in node_idx:
-                teg.add_edge('{}_{}'.format(u, t), '{}_{}'.format(u, t+1))
+                teg['{}_{}'.format(u, t)].append(('{}_{}'.format(u, t+1), float("inf")))
 
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg.add_edge( '{}_{}'.format(v, t), '{}_{}'.format(u, t+1), capacity=capacity)
-
+                    teg['{}_{}'.format(v, t)].append(('{}_{}'.format(u, t+1), capacity))
         return super_source, super_sink, teg, restricted_edges
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
