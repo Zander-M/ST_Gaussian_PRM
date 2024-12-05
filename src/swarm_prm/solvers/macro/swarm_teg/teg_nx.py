@@ -57,7 +57,7 @@ class TEGGraph_NX:
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg.add_edge( '{}_{}'.format(v, t), '{}_{}'.format(u, t+1), capacity=capacity)
+                    teg.add_edge( '{}_{}'.format(u, t), '{}_{}'.format(v, t+1), capacity=capacity)
 
         return super_source, super_sink, teg, restricted_edges
 

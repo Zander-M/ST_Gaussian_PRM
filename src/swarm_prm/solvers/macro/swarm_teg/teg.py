@@ -7,8 +7,9 @@ from collections import defaultdict
 from matplotlib import pyplot as plt
 import networkx as nx
 from swarm_prm.solvers.macro.swarm_teg.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.swarm_teg.max_flow import MaxFlowSolver
 
-class TEGGraph_NX:
+class TEGGraph:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, target_flow, max_timestep=100) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
@@ -21,8 +22,7 @@ class TEGGraph_NX:
         """
             Build TEG based on timestep
         """
-        from networkx.algorithms.flow import shortest_augmenting_path
-        teg = nx.DiGraph()
+        teg = defaultdict(lambda:dict())
         super_source = "SS"
         super_sink = "SG"
 
@@ -31,34 +31,25 @@ class TEGGraph_NX:
         # Visualization source and restricted_edges are hidden
         # duirng TEG visualization
 
-        vis_source = "VS" 
         restricted_edges  = []
-        for vis_idx in node_idx:
-            edge = (vis_source, '{}_{}'.format(vis_idx, 0))
-            teg.add_edge(edge[0], edge[1])
-            restricted_edges.append(edge)
 
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg.add_edge(super_source, '{}_{}'.format(start_idx, 0), 
-                         capacity=int(self.gaussian_prm.starts_weight[i]*self.target_flow))
+            teg[super_source]['{}_{}'.format(start_idx, 0)] = int(self.gaussian_prm.starts_weight[i]*self.target_flow)
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg.add_edge('{}_{}'.format(goal_idx, timestep),super_sink,
-                         capacity=int(self.gaussian_prm.goals_weight[i]*self.target_flow))
+            teg['{}_{}'.format(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
 
         for t in range(timestep):
-
             # adding wait edges
             for u in node_idx:
-                teg.add_edge('{}_{}'.format(u, t), '{}_{}'.format(u, t+1))
+                teg['{}_{}'.format(u, t)]['{}_{}'.format(u, t+1)] = float("inf")
 
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg.add_edge( '{}_{}'.format(v, t), '{}_{}'.format(u, t+1), capacity=capacity)
-
+                    teg['{}_{}'.format(u, t)]['{}_{}'.format(v, t+1)] = capacity
         return super_source, super_sink, teg, restricted_edges
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
@@ -85,10 +76,11 @@ class TEGGraph_NX:
         """
         timestep = 0
         max_flow = 0
-        flow_dict = {}
+        flow_dict = None
         while timestep < self.max_timestep:
             super_source, super_sink, teg, restricted_edges = self.build_teg(timestep)
-            max_flow, flow_dict = nx.maximum_flow(teg, super_source, super_sink)
+
+            max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink).solve()
             print("timestep:", timestep, "max_flow:", max_flow)
             if max_flow == self.target_flow:
                 return max_flow, flow_dict, timestep, teg, restricted_edges
@@ -121,11 +113,9 @@ class TEGGraph_NX:
         # Hide visualization source and extra edges
         teg = nx.restricted_view(teg, ["VS"], restricted_edges)
 
-
         # Draw nodes and edges
         nx.draw(teg, pos, with_labels=True, node_color='lightblue', node_size=300, font_size=16, edge_color='gray')
         nx.draw_networkx_edge_labels(teg, pos, edge_labels=edge_labels)
-
 
         # Display the plot
         plt.title("Graph Visualization")

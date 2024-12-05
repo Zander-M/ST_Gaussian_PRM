@@ -22,7 +22,7 @@ class TEGGraph:
         """
             Build TEG based on timestep
         """
-        teg = defaultdict(list)
+        teg = defaultdict()
         super_source = "SS"
         super_sink = "SG"
 
@@ -55,22 +55,24 @@ class TEGGraph:
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg['{}_{}'.format(v, t)].append(('{}_{}'.format(u, t+1), capacity))
+                    teg['{}_{}'.format(u, t)].append(('{}_{}'.format(v, t+1), capacity))
+            print(teg)
+            assert False
         return super_source, super_sink, teg, restricted_edges
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
         """
             Find the earliest timestep that reaches the max flow
         """
-        graph = defaultdict(list)
+        graph = defaultdict(lambda:dict())
 
         if method == "MIN_CAPACITY":
             for edge in self.gaussian_prm.roadmap:
                 u, v = edge
                 capacity = min(self.gaussian_prm.gaussian_nodes[u].get_capacity(self.agent_radius),
                                self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
-                graph[u].append((v, capacity))
-                graph[v].append((u, capacity))
+                graph[u][v] = capacity
+                graph[v][u] = capacity
 
         elif method == "VERTEX_CAPACITY":
             assert False, "Unimplemented roadmap graph construction method."
@@ -85,7 +87,8 @@ class TEGGraph:
         flow_dict = {}
         while timestep < self.max_timestep:
             super_source, super_sink, teg, restricted_edges = self.build_teg(timestep)
-            max_flow, flow_dict = nx.maximum_flow(teg, super_source, super_sink)
+
+            max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink).solve()
             print("timestep:", timestep, "max_flow:", max_flow)
             if max_flow == self.target_flow:
                 return max_flow, flow_dict, timestep, teg, restricted_edges
@@ -100,33 +103,3 @@ class TEGGraph:
         """
         trajectory = []
         return trajectory
-
-
-    def visualize_teg(self, teg, restricted_edges):
-        """
-            Visualize TEG 
-        """
-        node_labels = {node: node for node in teg.nodes()}
-        edge_labels = nx.get_edge_attributes(teg, 'capacity')
-
-        # Draw the graph
-        plt.figure(figsize=(10, 8))  # Set the size of the figure
-        teg = teg.to_undirected()
-        pos = nx.bfs_layout(teg, "VS")  # type: ignore # Compute positions using the spring layout
-        pos["SS"] = pos["VS"]
-
-        # Hide visualization source and extra edges
-        teg = nx.restricted_view(teg, ["VS"], restricted_edges)
-
-
-        # Draw nodes and edges
-        nx.draw(teg, pos, with_labels=True, node_color='lightblue', node_size=300, font_size=16, edge_color='gray')
-        nx.draw_networkx_edge_labels(teg, pos, edge_labels=edge_labels)
-
-
-        # Display the plot
-        plt.title("Graph Visualization")
-        plt.xlabel("X Coordinate")
-        plt.ylabel("Y Coordinate")
-        plt.grid(True)
-        plt.show()
