@@ -25,12 +25,6 @@ class TEGGraph:
         super_sink = "SG"
 
         node_idx = [i for i in range(len(self.gaussian_prm.samples))]
-        # Adding timestep -1 node for visualization purpose
-        # Visualization source and restricted_edges are hidden
-        # duirng TEG visualization
-
-        restricted_edges  = []
-
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
@@ -48,7 +42,8 @@ class TEGGraph:
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
                     teg['{}_{}'.format(u, t)]['{}_{}'.format(v, t+1)] = capacity
-        return super_source, super_sink, teg, restricted_edges
+
+        return super_source, super_sink, teg 
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
         """
@@ -73,6 +68,28 @@ class TEGGraph:
             Update Time Expanded Graph from previous timestep 
         """
         assert prev_timestep < curr_timestep, "Previous Timestep should be larger than curr timestep"
+        super_sink = "SG"
+        node_idx = [i for i in range(len(self.gaussian_prm.samples))]
+
+        # update edges to super sink
+        for _, goal_idx in enumerate(self.gaussian_prm.goals_idx):
+            del teg['{}_{}'.format(goal_idx, prev_timestep)][super_sink] 
+
+        for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
+            teg['{}_{}'.format(goal_idx, curr_timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+
+
+        # update edges
+
+        for t in range(prev_timestep, curr_timestep):
+            # adding wait edges
+            for u in node_idx:
+                teg['{}_{}'.format(u, t)]['{}_{}'.format(u, t+1)] = float("inf")
+
+            # adding graph edges
+            for u in self.roadmap_graph:
+                for v, capacity in self.roadmap_graph[u]:
+                    teg['{}_{}'.format(u, t)]['{}_{}'.format(v, t+1)] = capacity
 
 
     def find_earliest_timestep(self):
@@ -82,17 +99,18 @@ class TEGGraph:
         timestep = 0
         max_flow = 0
         flow_dict = None
-        while timestep < self.max_timestep:
-            super_source, super_sink, teg, restricted_edges = self.build_teg(timestep)
+        super_source, super_sink, teg = self.build_teg(timestep)
 
+        while timestep < self.max_timestep:
             max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink).solve()
             print("timestep:", timestep, "max_flow:", max_flow)
             if max_flow == self.target_flow:
-                return max_flow, flow_dict, timestep, teg, restricted_edges
+                return max_flow, flow_dict, timestep, teg 
             else:
                 timestep += 1
+            self.update_teg(teg, timestep-1, timestep)
 
-        return None, None, None, None, None
+        return None, None, None, None 
     
     def flow_to_trajectory(self, flow_dict):
         """

@@ -47,10 +47,15 @@ class MaxFlowSolver:
                     prev[neighbor] = curr_node
                     flow[neighbor] = min(flow[curr_node], capacity)
 
-                if neighbor == self.goal:
-                   return prev, flow[self.goal]
+                    if neighbor == self.goal:
+                        path = []
+                        curr_node = neighbor
+                        while curr_node:
+                            path.append(curr_node)
+                            curr_node = prev[curr_node]
+                        return path[::-1], flow[self.goal]
+                    open_list.append(neighbor)
 
-                open_list.append(neighbor)
         return None, 0
 
     def bidirectional_bfs(self):
@@ -114,8 +119,6 @@ class MaxFlowSolver:
 
         return path, flow
 
-    
-
     def update_flow(self, path, flow):
         """
             Update flow graph
@@ -135,13 +138,11 @@ class MaxFlowSolver:
             total_flow = 0
 
             while True:
-                path, flow = self.bidirectional_bfs()
+                path, flow = self.bfs()
                 if not path:
                     break
-                
-                for u, v in zip(path[:-1], path[1:]):
-                    self.residual_graph[u][v] -= flow
-                    self.residual_graph[v][u] += flow
+                self.update_flow(path, flow)
+
                 total_flow += flow
 
             return total_flow, self.residual_graph
