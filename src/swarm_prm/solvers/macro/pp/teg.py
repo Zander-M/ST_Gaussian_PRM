@@ -6,8 +6,8 @@
 from collections import defaultdict
 from matplotlib import pyplot as plt
 import networkx as nx
-from swarm_prm.solvers.macro.swarm_teg.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.swarm_teg.max_flow import MaxFlowSolver
+from swarm_prm.solvers.macro.pp.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.pp.max_flow import MaxFlowSolver
 
 class TEGGraph:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, target_flow, max_timestep=100) -> None:
@@ -22,7 +22,7 @@ class TEGGraph:
         """
             Build TEG based on timestep
         """
-        teg = defaultdict(lambda:dict())
+        teg = defaultdict()
         super_source = "SS"
         super_sink = "SG"
 
@@ -36,35 +36,48 @@ class TEGGraph:
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source]['{}_{}'.format(start_idx, 0)] = int(self.gaussian_prm.starts_weight[i]*self.target_flow)
+            teg[super_source].append((
+                        '{}_{}'.format(start_idx, 0), 
+                        int(self.gaussian_prm.starts_weight[i]*self.target_flow)
+                        ))
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg['{}_{}'.format(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+            teg['{}_{}'.format(goal_idx, timestep)].append((
+                        super_sink, 
+                        int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+                        ))
 
         for t in range(timestep):
             # adding wait edges
             for u in node_idx:
-                teg['{}_{}'.format(u, t)]['{}_{}'.format(u, t+1)] = float("inf")
+                teg['{}_{}'.format(u, t)].append(('{}_{}'.format(u, t+1), float("inf")))
 
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg['{}_{}'.format(u, t)]['{}_{}'.format(v, t+1)] = capacity
+                    teg['{}_{}'.format(u, t)].append(('{}_{}'.format(v, t+1), capacity))
+
         return super_source, super_sink, teg, restricted_edges
+    
+    def update_teg(self, prev_timestep, curr_timestep):
+        """
+            Update Time Expanded Graph. 
+        """
+        assert False
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
         """
             Find the earliest timestep that reaches the max flow
         """
-        graph = defaultdict(list)
+        graph = defaultdict(lambda:dict())
 
         if method == "MIN_CAPACITY":
             for edge in self.gaussian_prm.roadmap:
                 u, v = edge
                 capacity = min(self.gaussian_prm.gaussian_nodes[u].get_capacity(self.agent_radius),
                                self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
-                graph[u].append((v, capacity))
-                graph[v].append((u, capacity))
+                graph[u][v] = capacity
+                graph[v][u] = capacity
 
         elif method == "VERTEX_CAPACITY":
             assert False, "Unimplemented roadmap graph construction method."
@@ -76,7 +89,7 @@ class TEGGraph:
         """
         timestep = 0
         max_flow = 0
-        flow_dict = None
+        flow_dict = {}
         while timestep < self.max_timestep:
             super_source, super_sink, teg, restricted_edges = self.build_teg(timestep)
 
@@ -95,31 +108,3 @@ class TEGGraph:
         """
         trajectory = []
         return trajectory
-
-
-    def visualize_teg(self, teg, restricted_edges):
-        """
-            Visualize TEG 
-        """
-        node_labels = {node: node for node in teg.nodes()}
-        edge_labels = nx.get_edge_attributes(teg, 'capacity')
-
-        # Draw the graph
-        plt.figure(figsize=(10, 8))  # Set the size of the figure
-        teg = teg.to_undirected()
-        pos = nx.bfs_layout(teg, "VS")  # type: ignore # Compute positions using the spring layout
-        pos["SS"] = pos["VS"]
-
-        # Hide visualization source and extra edges
-        teg = nx.restricted_view(teg, ["VS"], restricted_edges)
-
-        # Draw nodes and edges
-        nx.draw(teg, pos, with_labels=True, node_color='lightblue', node_size=300, font_size=16, edge_color='gray')
-        nx.draw_networkx_edge_labels(teg, pos, edge_labels=edge_labels)
-
-        # Display the plot
-        plt.title("Graph Visualization")
-        plt.xlabel("X Coordinate")
-        plt.ylabel("Y Coordinate")
-        plt.grid(True)
-        plt.show()

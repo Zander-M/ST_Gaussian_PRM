@@ -8,7 +8,7 @@ from typing import List
 import yaml
 
 from swarm_prm.envs.map import Map, MapLoader
-from swarm_prm.solvers.macro.swarm_teg.gaussian_utils import GaussianGraphNode
+from swarm_prm.solvers.macro.teg.gaussian_utils import GaussianGraphNode
 
 ##### Instance #####
 

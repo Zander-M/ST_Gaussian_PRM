@@ -16,7 +16,7 @@ from queue import PriorityQueue
 from matplotlib import pyplot as plt
 import networkx as nx
 
-from swarm_prm.solvers.macro.swarm_teg.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.teg.gaussian_prm import GaussianPRM
 
 class CBS_NX:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, target_flow, max_timestep=100) -> None:

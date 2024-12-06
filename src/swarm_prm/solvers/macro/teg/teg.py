@@ -4,10 +4,8 @@
 """
 
 from collections import defaultdict
-from matplotlib import pyplot as plt
-import networkx as nx
-from swarm_prm.solvers.macro.swarm_max_flow.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.swarm_max_flow.max_flow import MaxFlowSolver
+from swarm_prm.solvers.macro.teg.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.teg.max_flow import MaxFlowSolver
 
 class TEGGraph:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, target_flow, max_timestep=100) -> None:
@@ -22,7 +20,7 @@ class TEGGraph:
         """
             Build TEG based on timestep
         """
-        teg = defaultdict()
+        teg = defaultdict(lambda:dict())
         super_source = "SS"
         super_sink = "SG"
 
@@ -36,47 +34,46 @@ class TEGGraph:
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source].append((
-                        '{}_{}'.format(start_idx, 0), 
-                        int(self.gaussian_prm.starts_weight[i]*self.target_flow)
-                        ))
+            teg[super_source]['{}_{}'.format(start_idx, 0)] = int(self.gaussian_prm.starts_weight[i]*self.target_flow)
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg['{}_{}'.format(goal_idx, timestep)].append((
-                        super_sink, 
-                        int(self.gaussian_prm.goals_weight[i]*self.target_flow)
-                        ))
+            teg['{}_{}'.format(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
 
         for t in range(timestep):
             # adding wait edges
             for u in node_idx:
-                teg['{}_{}'.format(u, t)].append(('{}_{}'.format(u, t+1), float("inf")))
+                teg['{}_{}'.format(u, t)]['{}_{}'.format(u, t+1)] = float("inf")
 
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg['{}_{}'.format(u, t)].append(('{}_{}'.format(v, t+1), capacity))
-            print(teg)
-            assert False
+                    teg['{}_{}'.format(u, t)]['{}_{}'.format(v, t+1)] = capacity
         return super_source, super_sink, teg, restricted_edges
 
     def build_roadmap_graph(self, method="MIN_CAPACITY"):
         """
             Find the earliest timestep that reaches the max flow
         """
-        graph = defaultdict(lambda:dict())
+        graph = defaultdict(list)
 
         if method == "MIN_CAPACITY":
             for edge in self.gaussian_prm.roadmap:
                 u, v = edge
                 capacity = min(self.gaussian_prm.gaussian_nodes[u].get_capacity(self.agent_radius),
                                self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
-                graph[u][v] = capacity
-                graph[v][u] = capacity
+                graph[u].append((v, capacity))
+                graph[v].append((u, capacity))
 
         elif method == "VERTEX_CAPACITY":
             assert False, "Unimplemented roadmap graph construction method."
         return graph
+    
+    def update_teg(self, teg, prev_timestep, curr_timestep):
+        """
+            Update Time Expanded Graph from previous timestep 
+        """
+        assert prev_timestep < curr_timestep, "Previous Timestep should be larger than curr timestep"
+
 
     def find_earliest_timestep(self):
         """
@@ -84,7 +81,7 @@ class TEGGraph:
         """
         timestep = 0
         max_flow = 0
-        flow_dict = {}
+        flow_dict = None
         while timestep < self.max_timestep:
             super_source, super_sink, teg, restricted_edges = self.build_teg(timestep)
 
