@@ -66,8 +66,6 @@ class MaxFlowSolver:
         backward_queue= deque([self.goal])
         forward_parent= {self.start: None}
         backward_parent= {self.goal: None}
-        forward_visited = set([self.start])
-        backward_visited= set([self.goal ])
 
         while forward_queue and backward_queue:
             if forward_queue:
@@ -75,20 +73,18 @@ class MaxFlowSolver:
                 for neighbor, capacity in self.residual_graph[current].items():
                     if neighbor not in forward_parent and capacity > 0:
                         forward_parent[neighbor] = current
-                        forward_visited.add(neighbor)
-                        forward_queue.append(neighbor)
-                        if neighbor in backward_visited:
+                        if neighbor in backward_parent:
                             return self._construct_path(forward_parent, backward_parent, neighbor)
+                        forward_queue.append(neighbor)
 
             if backward_queue:
                 current = backward_queue.popleft()
                 for neighbor, capacity in self.residual_graph[current].items():
-                    if current not in backward_parent and capacity > 0:
-                        backward_parent[current] = neighbor
-                        backward_visited.add(neighbor)
-                        backward_queue.append(neighbor)
-                        if neighbor in forward_visited:
+                    if neighbor not in backward_parent and capacity > 0:
+                        backward_parent[neighbor] = current 
+                        if neighbor in forward_parent:
                             return self._construct_path(forward_parent, backward_parent, neighbor)
+                        backward_queue.append(neighbor)
         return None, 0
 
     def _construct_path(self, forward_parent, backward_parent, meeting_point):
@@ -97,7 +93,6 @@ class MaxFlowSolver:
         """
         path = []
         flow = float("inf")
-
         # Build forward path
         current = meeting_point
         while current is not None:
@@ -116,7 +111,6 @@ class MaxFlowSolver:
             current = backward_parent[current]
             if current is not None:
                 path.append(current)
-
         return path, flow
 
     def update_flow(self, path, flow):
@@ -138,7 +132,7 @@ class MaxFlowSolver:
             total_flow = 0
 
             while True:
-                path, flow = self.bfs()
+                path, flow = self.bidirectional_bfs()
                 if not path:
                     break
                 self.update_flow(path, flow)

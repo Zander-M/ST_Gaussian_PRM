@@ -104,10 +104,14 @@ class TEGGraph:
         while timestep < self.max_timestep:
             max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink).solve()
             print("timestep:", timestep, "max_flow:", max_flow)
+            # if timestep == 25:
+            #     print(flow_dict)
+            #     assert False
             if max_flow == self.target_flow:
                 return max_flow, flow_dict, timestep, teg 
             else:
                 timestep += 1
+            
             self.update_teg(teg, timestep-1, timestep)
 
         return None, None, None, None 
