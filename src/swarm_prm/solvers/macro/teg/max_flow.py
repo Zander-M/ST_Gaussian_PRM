@@ -79,8 +79,8 @@ class MaxFlowSolver:
 
             if backward_queue:
                 current = backward_queue.popleft()
-                for neighbor, capacity in self.residual_graph[current].items():
-                    if neighbor not in backward_parent and capacity > 0:
+                for neighbor, _ in self.residual_graph[current].items():
+                    if neighbor not in backward_parent and self.residual_graph[neighbor][current] > 0:
                         backward_parent[neighbor] = current 
                         if neighbor in forward_parent:
                             return self._construct_path(forward_parent, backward_parent, neighbor)
