@@ -11,7 +11,7 @@ from scipy.spatial import KDTree, Delaunay, Voronoi
 from scipy.stats.qmc import Halton
 from shapely.geometry import Point, Polygon
 
-from swarm_prm.solvers.macro.teg.gaussian_utils import *
+from swarm_prm.solvers.macro.gaussian_prm.gaussian_utils import *
 from swarm_prm.envs.instance import Instance
 
 class GaussianPRM:

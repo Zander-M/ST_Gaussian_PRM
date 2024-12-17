@@ -5,7 +5,7 @@
 from collections import defaultdict
 from matplotlib import pyplot as plt
 import networkx as nx
-from swarm_prm.solvers.macro.teg.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.gaussian_prm.gaussian_prm import GaussianPRM
 
 class TEGGraph_NX:
 
@@ -113,7 +113,7 @@ class TEGGraph_NX:
                 timestep += 1
             self.update_teg(teg, timestep-1, timestep)
 
-        return None, None, None, None, None
+        return None, None, None, None
     
     def flow_to_trajectory(self, flow_dict):
         """

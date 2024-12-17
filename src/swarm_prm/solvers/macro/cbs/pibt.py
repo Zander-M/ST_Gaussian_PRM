@@ -1,3 +1,0 @@
-"""
-    PIBT for MAPF
-"""

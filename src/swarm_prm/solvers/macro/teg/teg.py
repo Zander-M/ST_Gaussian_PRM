@@ -4,7 +4,7 @@
 """
 
 from collections import defaultdict
-from swarm_prm.solvers.macro.teg.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.gaussian_prm.gaussian_prm import GaussianPRM
 from swarm_prm.solvers.macro.teg.max_flow import MaxFlowSolver
 
 class TEGGraph:
@@ -15,6 +15,24 @@ class TEGGraph:
         self.max_timestep = max_timestep
         self.roadmap_graph = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
+
+    def build_roadmap_graph(self, method="MIN_CAPACITY"):
+        """
+            Find the earliest timestep that reaches the max flow
+        """
+        graph = defaultdict(list)
+
+        if method == "MIN_CAPACITY":
+            for edge in self.gaussian_prm.roadmap:
+                u, v = edge
+                capacity = min(self.gaussian_prm.gaussian_nodes[u].get_capacity(self.agent_radius),
+                               self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
+                graph[u].append((v, capacity))
+                graph[v].append((u, capacity))
+
+        elif method == "VERTEX_CAPACITY":
+            assert False, "Unimplemented roadmap graph construction method."
+        return graph
 
     def build_teg(self, timestep):
         """
@@ -45,23 +63,7 @@ class TEGGraph:
 
         return super_source, super_sink, teg 
 
-    def build_roadmap_graph(self, method="MIN_CAPACITY"):
-        """
-            Find the earliest timestep that reaches the max flow
-        """
-        graph = defaultdict(list)
 
-        if method == "MIN_CAPACITY":
-            for edge in self.gaussian_prm.roadmap:
-                u, v = edge
-                capacity = min(self.gaussian_prm.gaussian_nodes[u].get_capacity(self.agent_radius),
-                               self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
-                graph[u].append((v, capacity))
-                graph[v].append((u, capacity))
-
-        elif method == "VERTEX_CAPACITY":
-            assert False, "Unimplemented roadmap graph construction method."
-        return graph
     
     def update_teg(self, teg, prev_timestep, curr_timestep):
         """

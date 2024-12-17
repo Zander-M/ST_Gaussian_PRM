@@ -10,7 +10,7 @@ from scipy.stats import norm
 from shapely.geometry import LineString, Point, Polygon
 import yaml
 
-from swarm_prm.solvers.macro.teg.gaussian_utils import GaussianNode
+from swarm_prm.solvers.macro.gaussian_prm.gaussian_utils import GaussianNode
 
 ##### Map       #####
 
