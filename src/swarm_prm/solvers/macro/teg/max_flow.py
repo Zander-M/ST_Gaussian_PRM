@@ -8,15 +8,16 @@ class MaxFlowSolver:
     """
         Max Flow Solver that can reuse partial solutions.
     """
-    def __init__(self, graph, start, goal, flow=None, 
+    def __init__(self, graph, start, goal, flow_dict=None, 
                  search_method="EK") -> None:
         """
             Max flow
         """
         self.graph = graph
-        self.flow = flow
         self.search_method = search_method
-        self.residual_graph = self.build_residual_graph()
+
+        # reuse previous search result if possible
+        self.residual_graph = flow_dict if flow_dict else self.build_residual_graph()
         self.start = start
         self.goal = goal
     
