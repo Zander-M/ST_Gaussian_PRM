@@ -8,7 +8,8 @@ class MaxFlowSolver:
     """
         Max Flow Solver that can reuse partial solutions.
     """
-    def __init__(self, graph, start, goal, flow_dict=None, 
+    def __init__(self, graph, start, goal, 
+                 flow_dict=None, initial_flow=0,
                  search_method="EK") -> None:
         """
             Max flow
@@ -18,6 +19,9 @@ class MaxFlowSolver:
 
         # reuse previous search result if possible
         self.residual_graph = flow_dict if flow_dict else self.build_residual_graph()
+
+        # if provided residual graph, update initial flow
+        self.initial_flow = initial_flow
         self.start = start
         self.goal = goal
     
@@ -31,6 +35,23 @@ class MaxFlowSolver:
                 augment_graph[u][v] = self.graph[u][v]
                 augment_graph[v][u] = 0
         return augment_graph
+    
+    def build_forward_bound(self):
+        """
+            Compute the shortest distance to any possible goal. If remaining time
+            is less than the shortest distance, stop searching
+        """
+        forward_bound = dict()
+        return forward_bound
+
+    def build_backward_bound(self):
+        """
+            Compute the shortest distance to any possible goal. If remaining time
+            is less than the shortest distance, stop searching
+        """
+        backward_bound = dict()
+        return backward_bound
+    
         
     def bfs(self):
         """
@@ -130,7 +151,7 @@ class MaxFlowSolver:
             """
                 Edmond Karp 
             """
-            total_flow = 0
+            total_flow = self.initial_flow
 
             while True:
                 path, flow = self.bidirectional_bfs()
