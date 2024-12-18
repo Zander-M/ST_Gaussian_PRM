@@ -19,7 +19,6 @@ class TEGGraph:
     def get_min_timestep(self):
         """
             Find the ealiest timestep for any agent to reach any goal using bfs
-            TODO: implement this 
         """
         open_list = deque(zip([start for start in self.gaussian_prm.starts_idx], [0] * len(self.gaussian_prm.starts_idx)))
         goals = set(self.gaussian_prm.goals_idx)
@@ -84,7 +83,6 @@ class TEGGraph:
     def update_teg_flow_dict(self, teg, flow_dict, timestep):
         """
             Update Time Expanded Graph from previous timestep 
-            TODO: fix flow update
         """
 
         ### TEG
@@ -130,20 +128,19 @@ class TEGGraph:
             del flow_dict['{}_{}'.format(goal_idx, timestep-1)][super_sink]
             del flow_dict[super_sink]['{}_{}'.format(goal_idx, timestep-1)]
 
-
-
     def get_earliest_timestep(self):
         """
             Find earliest timestep such that the graph reaches target flow
         """
         timestep = self.get_min_timestep()
-        max_flow = int(0)
+        max_flow = 0
         flow_dict = None
 
         super_source, super_sink, teg = self.build_teg(timestep)
 
         while timestep < self.max_timestep:
-            max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink, flow_dict=flow_dict, initial_flow=max_flow).solve()
+            max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink, 
+                                    flow_dict=flow_dict, initial_flow=max_flow).solve()
             print("timestep:", timestep, "max_flow:", max_flow)
             if max_flow == self.target_flow:
                 return max_flow, flow_dict, timestep, teg 
@@ -152,7 +149,6 @@ class TEGGraph:
             self.update_teg_flow_dict(teg, flow_dict, timestep)
 
         return None, None, None, None 
-
     
     def flow_to_trajectory(self, flow_dict):
         """

@@ -9,7 +9,7 @@ class MaxFlowSolver:
         Max Flow Solver that can reuse partial solutions.
     """
     def __init__(self, graph, start, goal, 
-                 flow_dict=None, initial_flow=0,
+                 flow_dict=None, initial_flow=0.,
                  search_method="EK") -> None:
         """
             Max flow
@@ -40,6 +40,7 @@ class MaxFlowSolver:
         """
             Compute the shortest distance to any possible goal. If remaining time
             is less than the shortest distance, stop searching
+            TODO: implement this
         """
         forward_bound = dict()
         return forward_bound
@@ -48,6 +49,7 @@ class MaxFlowSolver:
         """
             Compute the shortest distance to any possible goal. If remaining time
             is less than the shortest distance, stop searching
+            TODO: implement this
         """
         backward_bound = dict()
         return backward_bound
@@ -168,7 +170,5 @@ class MaxFlowSolver:
                 Bulk Search
             """
             assert False, "Not Implemented"
-            return 0, self.residual_graph
-        
         else:
             assert False, "Not Implemented"
