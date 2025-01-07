@@ -10,7 +10,9 @@ class MaxFlowSolver:
     """
     def __init__(self, graph, start, goal, 
                  flow_dict=None, initial_flow=0.,
-                 search_method="EK") -> None:
+                 search_method="EK",
+                 forward_bound_func=None,
+                 backward_bound_func=None) -> None:
         """
             Max flow
         """
@@ -24,6 +26,8 @@ class MaxFlowSolver:
         self.initial_flow = initial_flow
         self.start = start
         self.goal = goal
+        self.forward_bound_func = forward_bound_func
+        self.backward_bound_func = backward_bound_func
     
     def build_residual_graph(self):
         """
@@ -54,7 +58,6 @@ class MaxFlowSolver:
         backward_bound = dict()
         return backward_bound
     
-        
     def bfs(self):
         """
             BFS for finding augmenting path

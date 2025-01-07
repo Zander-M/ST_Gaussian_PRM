@@ -86,7 +86,6 @@ class TEGGraph:
         """
 
         ### TEG
-
         super_sink = "SG"
 
         # update edges to super sink
