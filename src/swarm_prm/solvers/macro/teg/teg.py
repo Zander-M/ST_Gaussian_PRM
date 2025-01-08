@@ -1,6 +1,6 @@
 """
-    Max flow on Time Expanded Graph. Result from previous timestep is preserved
-    to speed up the lookup.
+    Max flow on Time Expanded Graph. Result from previous timestep is reused
+    to speed up the algorithm.
 """
 
 from collections import defaultdict, deque
@@ -84,11 +84,9 @@ class TEGGraph:
         """
             Update Time Expanded Graph from previous timestep 
         """
-
         ### TEG
 
         super_sink = "SG"
-
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
             del teg['{}_{}'.format(goal_idx, timestep-1)][super_sink] 
@@ -132,27 +130,41 @@ class TEGGraph:
         """
             Find earliest timestep such that the graph reaches target flow
         """
+        # start from minimum path lengh between start and goal
         timestep = self.get_min_timestep()
         max_flow = 0
-        flow_dict = None
+        residual_graph = None
 
         super_source, super_sink, teg = self.build_teg(timestep)
 
         while timestep < self.max_timestep:
-            max_flow, flow_dict = MaxFlowSolver(teg, super_source, super_sink, 
-                                    flow_dict=flow_dict, initial_flow=max_flow).solve()
+            max_flow, residual_graph = MaxFlowSolver(teg, super_source, super_sink, 
+                                    residual_graph=residual_graph, initial_flow=max_flow).solve()
             print("timestep:", timestep, "max_flow:", max_flow)
+
+            # by construction the max flow will not exceed the target flow
             if max_flow == self.target_flow:
+                flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
                 return max_flow, flow_dict, timestep, teg 
             else:
                 timestep += 1
-            self.update_teg_flow_dict(teg, flow_dict, timestep)
+            self.update_teg_flow_dict(teg, residual_graph, timestep)
 
         return None, None, None, None 
     
-    def flow_to_trajectory(self, flow_dict):
+    def _residual_to_flow(self, teg, residual):
         """
-            Convert Flow to Trajectories per agent
+            Construct forward flow graph from residual graph
         """
-        trajectory = []
-        return trajectory
+        flow_dict = defaultdict(lambda: dict())
+        for u in teg:
+            for v in teg[u]:
+                if teg[u][v] == float("inf"):
+                    flow = residual[v][u]
+                    if flow > 0:
+                        flow_dict[u][v] = flow 
+                else:
+                    flow = teg[u][v] - residual[u][v]
+                    if flow > 0:
+                        flow_dict[u][v] = flow
+        return flow_dict

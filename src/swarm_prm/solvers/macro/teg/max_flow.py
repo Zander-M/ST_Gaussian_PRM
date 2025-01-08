@@ -6,10 +6,10 @@ from collections import defaultdict, deque
 
 class MaxFlowSolver:
     """
-        Max Flow Solver that can reuse partial solutions.
+        Max Flow Solver that can reuse residual graphs.
     """
     def __init__(self, graph, start, goal, 
-                 flow_dict=None, initial_flow=0.,
+                 residual_graph=None, initial_flow=0.,
                  search_method="EK") -> None:
         """
             Max flow
@@ -18,7 +18,7 @@ class MaxFlowSolver:
         self.search_method = search_method
 
         # reuse previous search result if possible
-        self.residual_graph = flow_dict if flow_dict else self.build_residual_graph()
+        self.residual_graph = residual_graph if residual_graph else self.build_residual_graph()
 
         # if provided residual graph, update initial flow
         self.initial_flow = initial_flow
