@@ -85,7 +85,6 @@ class TEGGraph:
             Update Time Expanded Graph from previous timestep 
         """
         ### TEG
-
         super_sink = "SG"
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
