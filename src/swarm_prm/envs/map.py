@@ -10,7 +10,7 @@ from scipy.stats import norm
 from shapely.geometry import LineString, Point, Polygon
 import yaml
 
-from swarm_prm.solvers.macro.gaussian_prm.gaussian_utils import GaussianNode
+from swarm_prm.solvers.utils.gaussian_utils import GaussianNode
 
 ##### Map       #####
 
@@ -184,12 +184,11 @@ class Map:
         """
         if ax is None:
             fig, ax = plt.subplots()
-        ax.set_xlim([0, self.width])
-        ax.set_ylim([0, self.height])
+        ax.set_xlim((0., self.width))
+        ax.set_ylim((0., self.height))
         for obs in self.get_obstacles():
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
-                # ax.plot(x, y, 'ro', markersize=3)
                 ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
             elif obs.obs_type == "POLYGON":
                 x, y = obs.geom.exterior.xy

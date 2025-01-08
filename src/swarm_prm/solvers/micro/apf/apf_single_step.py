@@ -10,8 +10,8 @@ import numpy as np
 from shapely.geometry import Point
 from shapely.ops import nearest_points
 
-from swarm_prm.solvers.macro.gaussian_prm.gaussian_utils import GaussianNode
-from swarm_prm.solvers.micro.utils.spatial_hash import SpatialHash
+from swarm_prm.solvers.utils.gaussian_utils import GaussianNode
+from swarm_prm.solvers.utils.spatial_hash import SpatialHash
 
 class APFSingleStepSolver:
     """

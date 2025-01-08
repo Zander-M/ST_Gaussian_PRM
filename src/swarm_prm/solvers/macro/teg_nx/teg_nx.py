@@ -5,7 +5,7 @@
 from collections import defaultdict
 from matplotlib import pyplot as plt
 import networkx as nx
-from swarm_prm.solvers.macro.gaussian_prm.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 
 class TEGGraph_NX:
 
