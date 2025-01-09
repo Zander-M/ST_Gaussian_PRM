@@ -38,6 +38,16 @@ class DRRT_star:
         """
             Oracle steering function
         """
+
+    def expandRRTStar(self):
+        """
+            Expand RRT Star 
+        """
+    
+    def getParent(self, nodes):
+        """
+            Get node parent
+        """
     
     def get_distance(self, node1, node2):
         """

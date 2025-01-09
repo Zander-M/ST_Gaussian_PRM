@@ -186,6 +186,7 @@ class Map:
             fig, ax = plt.subplots()
         ax.set_xlim((0., self.width))
         ax.set_ylim((0., self.height))
+        ax.set_aspect('equal')
         for obs in self.get_obstacles():
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
@@ -193,7 +194,6 @@ class Map:
             elif obs.obs_type == "POLYGON":
                 x, y = obs.geom.exterior.xy
                 ax.fill(x, y, fc="black")
-        ax.set_aspect('equal')
         return fig, ax
 
     def get_openfoam_config(self):
