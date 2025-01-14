@@ -196,6 +196,7 @@ class GaussianPRM:
                 largest circle that fits in each cell to set the Gaussian mean
                 and covariance.
             """
+            
         
         elif sampling_strategy == "HEXAGON":
             """
