@@ -39,7 +39,7 @@ class DRRT_star:
             Oracle steering function
         """
 
-    def expandRRTStar(self):
+    def expand_drrt_star(self):
         """
             Expand RRT Star 
         """
@@ -58,5 +58,3 @@ class DRRT_star:
         """
             Get solution per agent
         """
-
-
