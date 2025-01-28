@@ -197,7 +197,6 @@ class GaussianPRM:
                 and covariance.
             """
             
-        
         elif sampling_strategy == "HEXAGON":
             """
                 Hexagonal map construction
