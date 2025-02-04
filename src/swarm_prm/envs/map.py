@@ -50,11 +50,23 @@ class Map:
         dist = [obs.get_dist(point) for obs in self.obstacles]
         return self.obstacles[np.argsort(dist)[0]]
 
+    def get_bounding_polygon_shapely(self):
+        """
+           Get bounding polygon of the space 
+        """
+        return Polygon([(0, 0), (self.width, 0), (self.width, self.height), (0, self.height)])
+
     def get_obstacles(self):
         """
             Return obstacles
         """
         return self.obstacles
+    
+    def get_obstacles_shapely(self):
+        """
+            Return obstacles in shapely geometry form
+        """
+        return [obs.geom for obs in self.obstacles]
 
     def is_line_collision(self, line_start, line_end):
         """

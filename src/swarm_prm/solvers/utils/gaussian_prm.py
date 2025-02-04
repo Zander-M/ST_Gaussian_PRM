@@ -345,6 +345,12 @@ class GaussianPRM:
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
 
+    def get_bounding_polygon(self):
+        """
+            Get bounding polygons of the map
+        """
+        return self.map.get_bounding_polygon_shapely()
+
     def get_macro_solution(self, flow_dict):
         """
             Get macro solution containing goals and number of agent at each
@@ -372,6 +378,12 @@ class GaussianPRM:
                     macro_solution[t][u].append((v, flow_dict[in_node][out_node]))
         return macro_solution
         
+    def get_obstacles(self):
+        """
+            Get obstacles in the space
+        """
+        return self.map.get_obstacles()
+
     def get_solution(self, flow_dict, timestep, num_agent):
         """
             Return macro solution path per agent

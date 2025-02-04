@@ -165,7 +165,7 @@ def plot_voronoi(voronoi, bounding_polygon, obstacles):
         if cell_polygon.is_valid and not cell_polygon.is_empty:
             x, y = cell_polygon.exterior.xy
             plt.fill(x, y, alpha=0.4, edgecolor='k')
-            center, A_matrix = CVT.johns_ellipsoid_edge_constraints(orient(cell_polygon))
+            center, A_matrix = CVT.johns_ellipsoid_edge_constraints(orient(cell_polygon)) # FIXIT
             plot_ellipsoid(ax, center, A_matrix)
             
 
