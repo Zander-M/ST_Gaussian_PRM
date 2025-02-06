@@ -8,6 +8,7 @@ import numpy as np
 import os
 from scipy.stats import norm
 from shapely.geometry import LineString, Point, Polygon
+from shapely.ops import nearest_points
 import yaml
 
 from swarm_prm.solvers.utils.gaussian_utils import GaussianNode
@@ -251,6 +252,14 @@ class Obstacle:
         """
         point_geom = Point(point)
         return point_geom.distance(self.geom)
+    
+    def get_nearest_point(self, point):
+        """
+            Get the neareset point on the obstacle to the point
+        """
+        point_geom = Point(point)
+        nearest_point = nearest_points(point_geom, self.geom)[1]
+        return np.array(nearest_point.coords[0])
 
     def get_edge_segments(self, segment_length=2):
         """
@@ -322,13 +331,25 @@ class Obstacle:
     def is_gaussian_colliding(self, g_node:GaussianNode, alpha, threshold):
         """
             check if Gaussian distribution is too close to the obstacles
+            References: SwarmPRM
         """
-        mean = -self.get_dist(g_node.get_mean())
-        v_normal = (self.pos - g_node.get_mean()) / np.linalg.norm(self.pos - g_node.get_mean())
+
+        # Return true if the mean of the Gaussian node is inside the obstacle
+        if self.is_point_colliding(g_node.get_mean()):
+            return True
+
+        mean = self.get_dist(g_node.get_mean())
+        nearest_point = self.get_nearest_point(g_node.get_mean())
+        v = nearest_point - g_node.get_mean()
+        v_normal =  v / np.linalg.norm(v)
         variance = v_normal.T @ g_node.covariance @ v_normal
-        ita = norm(mean, variance)
-        cvar = mean + ita.pdf(ita.ppf(1-alpha))/alpha * variance # type: ignore
+        std_variance = np.sqrt(variance)
+        ita = norm(-mean, std_variance)
+        cvar = -mean + ita.pdf(ita.ppf(1-alpha))/alpha * std_variance 
+        # print(cvar)
         return cvar > threshold
+
+
     
     def is_geometry_colliding(self, geom):
         """
