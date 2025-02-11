@@ -13,6 +13,7 @@ from shapely.geometry import Point, Polygon
 
 from swarm_prm.solvers.utils.gaussian_utils import *
 from swarm_prm.envs.instance import Instance
+from swarm_prm.solvers.utils import CVT
 
 class GaussianPRM:
     """
@@ -274,76 +275,12 @@ class GaussianPRM:
                              collision_check_method=collision_check_method):
                         self.roadmap.append((simplex[i], simplex[i+1]))
 
-        elif roadmap_method == "VORONOI":
+        elif roadmap_method == "CVT":
             """
                 Construct roadmap by creating voronoi cells based on sampled points
             """
+            cvt_instance = CVT(self.samples, self.map.width, self.map.height, self.cvt_iteration)
             pass
-
-    def visualize_roadmap(self, fname="test_gaussian_prm"):
-        """
-            Visualize Gaussian PRM
-        """
-        fig, ax = plt.subplots(figsize=(10, 10))
-
-        # Nodes and Paths 
-
-        for node in self.samples:
-            ax.plot(node[0], node[1], 'co', markersize=2)
-        for (i, j) in self.roadmap:
-            ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
-
-        # Starts and goals
-        for start in self.instance.starts:
-            pos = start.get_mean()
-            ax.plot(pos[0], pos[1], 'bo', markersize=3)
-            start.visualize(ax=ax, edgecolor="blue")
-
-        for goal in self.instance.goals:
-            pos = goal.get_mean()
-            ax.plot(pos[0], pos[1], 'go', markersize=3)
-            goal.visualize(ax=ax, edgecolor="green")
-
-        for obs in self.map.obstacles:
-            if obs.obs_type == "CIRCLE": 
-                x, y = obs.get_pos()
-                # ax.plot(x, y, 'ro', markersize=3)
-                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
-            elif obs.obs_type == "POLYGON":
-                x, y = obs.geom.exterior.xy
-                ax.fill(x, y, fc="black")
-
-        ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.map.width)
-        ax.set_ylim(bottom=0, top=self.map.height)
-        plt.savefig("{}.png".format(fname))
-        return fig, ax
-    
-    def visualize_g_nodes(self, fname="test_g_nodes"):
-        """
-            Visualize Gaussian Nodes on the map
-        """
-        fig, ax = plt.subplots(figsize=(10, 10))
-
-        # Visualize G nodes
-        cmap = plt.get_cmap('tab10')
-        for i, gaussian_node in enumerate(self.gaussian_nodes):
-            gaussian_node.visualize(ax, edgecolor=cmap(i%10))
-
-        for obs in self.map.obstacles:
-            if obs.obs_type == "CIRCLE": 
-                x, y = obs.get_pos()
-                # ax.plot(x, y, 'ro', markersize=3)
-                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
-            elif obs.obs_type == "POLYGON":
-                x, y = obs.geom.exterior.xy
-                ax.fill(x, y, fc="black")
-
-        ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.map.width)
-        ax.set_ylim(bottom=0, top=self.map.height)
-        plt.savefig("{}.png".format(fname), dpi=400)
-        plt.show()
 
     def get_bounding_polygon(self):
         """
@@ -488,5 +425,72 @@ class GaussianPRM:
         anim = FuncAnimation(fig, update, frames=timestep, init_func=init,
                              blit=True, interval=100)
         anim.save("test_solution_path.gif", writer='pillow', fps=6)
+
+    # Visualization functions
+
+    def visualize_roadmap(self, fname="test_gaussian_prm"):
+        """
+            Visualize Gaussian PRM
+        """
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Nodes and Paths 
+
+        for node in self.samples:
+            ax.plot(node[0], node[1], 'co', markersize=2)
+        for (i, j) in self.roadmap:
+            ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
+
+        # Starts and goals
+        for start in self.instance.starts:
+            pos = start.get_mean()
+            ax.plot(pos[0], pos[1], 'bo', markersize=3)
+            start.visualize(ax=ax, edgecolor="blue")
+
+        for goal in self.instance.goals:
+            pos = goal.get_mean()
+            ax.plot(pos[0], pos[1], 'go', markersize=3)
+            goal.visualize(ax=ax, edgecolor="green")
+
+        for obs in self.map.obstacles:
+            if obs.obs_type == "CIRCLE": 
+                x, y = obs.get_pos()
+                # ax.plot(x, y, 'ro', markersize=3)
+                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
+            elif obs.obs_type == "POLYGON":
+                x, y = obs.geom.exterior.xy
+                ax.fill(x, y, fc="black")
+
+        ax.set_aspect('equal')
+        ax.set_xlim(left=0, right=self.map.width)
+        ax.set_ylim(bottom=0, top=self.map.height)
+        plt.savefig("{}.png".format(fname))
+        return fig, ax
+    
+    def visualize_g_nodes(self, fname="test_g_nodes"):
+        """
+            Visualize Gaussian Nodes on the map
+        """
+        fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Visualize G nodes
+        cmap = plt.get_cmap('tab10')
+        for i, gaussian_node in enumerate(self.gaussian_nodes):
+            gaussian_node.visualize(ax, edgecolor=cmap(i%10))
+
+        for obs in self.map.obstacles:
+            if obs.obs_type == "CIRCLE": 
+                x, y = obs.get_pos()
+                # ax.plot(x, y, 'ro', markersize=3)
+                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
+            elif obs.obs_type == "POLYGON":
+                x, y = obs.geom.exterior.xy
+                ax.fill(x, y, fc="black")
+
+        ax.set_aspect('equal')
+        ax.set_xlim(left=0, right=self.map.width)
+        ax.set_ylim(bottom=0, top=self.map.height)
+        plt.savefig("{}.png".format(fname), dpi=400)
+        plt.show()
 
 

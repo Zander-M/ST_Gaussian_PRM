@@ -332,6 +332,9 @@ class Obstacle:
         """
             check if Gaussian distribution is too close to the obstacles
             References: SwarmPRM
+
+            Theshold controls how strict the collision check is. 
+            The more negative the threshold, the more strict the check is.
         """
 
         # Return true if the mean of the Gaussian node is inside the obstacle
@@ -345,7 +348,7 @@ class Obstacle:
         variance = v_normal.T @ g_node.covariance @ v_normal
         std_variance = np.sqrt(variance)
         ita = norm(-mean, std_variance)
-        cvar = -mean + ita.pdf(ita.ppf(1-alpha))/alpha * std_variance 
+        cvar = -mean + ita.pdf(ita.ppf(1-alpha))/alpha * std_variance # type: ignore
         # print(cvar)
         return cvar > threshold
 

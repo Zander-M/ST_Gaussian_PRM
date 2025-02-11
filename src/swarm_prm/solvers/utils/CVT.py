@@ -12,11 +12,14 @@ class CVT:
     """
         Centroidal Voronoi Tessellation
     """
-    def __init__(self, roadmap, num_samples=200, iteration=10):
+    def __init__(self, roadmap, num_samples=200, iteration=10, cvar_threshold=0.95):
 
         self.roadmap = roadmap
         self.num_samples = num_samples
         self.iteration = iteration
+
+        # determine the CVaR threshold as the Gaussian Nodes equiprobable lines wrt the ellipsoids
+        self.cvar_threshold = cvar_threshold 
     
     def _compute_centroids(self, vor, points):
         """
@@ -58,6 +61,11 @@ class CVT:
 
         return np.array(new_points)
     
+    def get_gaussian_nodes(self, A_matrix, center):
+        """
+            Get the Gaussian nodes based on Ellipsoid A_matrix and center
+        """
+        
     def get_CVT(self):
         """
             Return the centroids and the ellipsoids
@@ -128,6 +136,13 @@ class CVT:
         else:
             print(prob.status)
             raise ValueError("Optimization failed.")
+    
+    def get_gaussian_roadmap(self):
+        """
+            Get the Gaussian roadmap
+        """
+
+        return 
         
 def plot_ellipsoid(ax, center, A_matrix, color='r'):
     """
@@ -142,6 +157,7 @@ def plot_ellipsoid(ax, center, A_matrix, color='r'):
 
     ax.plot(ellipse[0, :], ellipse[1, :], color)
 
+# Visualization Functions
 def plot_voronoi(voronoi, bounding_polygon, obstacles):
     """
         Plot Voronoi and inscribed ellipsoids
@@ -165,7 +181,7 @@ def plot_voronoi(voronoi, bounding_polygon, obstacles):
         if cell_polygon.is_valid and not cell_polygon.is_empty:
             x, y = cell_polygon.exterior.xy
             plt.fill(x, y, alpha=0.4, edgecolor='k')
-            center, A_matrix = CVT.johns_ellipsoid_edge_constraints(orient(cell_polygon)) # FIXIT
+            center, A_matrix = johns_ellipsoid_edge_constraints(orient(cell_polygon)) # FIXIT
             plot_ellipsoid(ax, center, A_matrix)
             
 
