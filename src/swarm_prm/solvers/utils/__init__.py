@@ -1,4 +1,5 @@
 from .gaussian_prm import *
 from .gaussian_utils import *
+from .gaussian_sampler import *
 from .spatial_hash import *
 from .CVT import *
