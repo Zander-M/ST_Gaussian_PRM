@@ -5,8 +5,32 @@
 from math import floor
 from matplotlib.patches import Ellipse
 import numpy as np
+from scipy.spatial import KDTree
 from scipy.linalg import sqrtm
 from scipy.stats import chi2
+
+def is_within_ci(point, g_node, chi2_thresh):
+    delta = point - g_node.get_mean()
+    mahalanobis_distance_square = delta.T @ np.linalg.inv(g_node.cov) @ delta
+    return mahalanobis_distance_square <= chi2_thresh
+
+def sample_gaussian(g_node, candidates, num_points, ci, min_spacing):
+
+    """
+        Return Gaussian Samples within the confidence interval
+        and a proper spacing
+    """
+    points = []
+    tree = KDTree([g_node.get_mean()])
+    chi2_thresh = chi2.ppf(ci, 2)
+    for candidate in candidates:
+        if len(points) == num_points:
+            break
+        if  is_within_ci(candidate, g_node, chi2_thresh) \
+            and tree.query(candidate)[0] > min_spacing :
+            points.append(candidate)
+            tree = KDTree(points)
+    return np.array(points)
 
 def gaussian_wasserstein_distance(mean1, cov1, mean2, cov2):
     """

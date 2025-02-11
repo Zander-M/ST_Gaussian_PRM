@@ -73,7 +73,6 @@ class DRRT:
         """
             Oracle steering function
         """
-
     
     def getParent(self, nodes):
         """

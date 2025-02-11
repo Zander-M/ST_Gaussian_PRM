@@ -1,10 +1,11 @@
 """
-    Assign Start-Goal pairs for each agent
+    Assign Start-Goal pairs for each agent using Euclidean distance as heuristics
 """
 
-import cvxpy as cp
+from scipy.spatial.distance import cdist
+from scipy.optimize import linear_sum_assignment
 
-from swarm_prm.solvers.utils import GaussianPRM
+from swarm_prm.solvers.utils import GaussianPRM, sample_gaussian
 
 class TargetAssignment:
     def __init__(self, start_agent_count, goal_agent_count, gaussian_prm:GaussianPRM):

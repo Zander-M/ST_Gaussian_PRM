@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 
 from swarm_prm.envs.map import Map, Obstacle
-from swarm_prm.solvers.swarm_prm.macro.gaussian_utils import *
+from swarm_prm.solvers.utils.gaussian_utils import *
 
 class RRTNode:
     """
@@ -32,7 +32,7 @@ class GaussianRRT:
         self.goal_thresh = goal_thresh
         self.sample_goal_prob = sample_goal_prob
         self.max_iter = max_iter
-        self.kd_tree = None
+        self.kd_tree = KDTree([start.g_node.mean]) 
 
         self.gaussian_nodes = []
 
