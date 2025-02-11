@@ -1,12 +1,12 @@
 """
     Voronoi Utils
 """
+import cvxpy as cp
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import Voronoi
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
-import cvxpy as cp
 
 class CVT:
     """

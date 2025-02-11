@@ -103,6 +103,13 @@ class GaussianPRM:
                     g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                     self.samples.append(node)
                     self.gaussian_nodes.append(g_node)
+        elif sampling_strategy == "CVT":
+            """
+                Perform Centroidal Voronoi Tesellation for choosing 
+                Gaussian Points
+            """
+            pass
+            
 
         elif sampling_strategy == "UNIFORM_WITH_RADIUS":
             min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
@@ -383,6 +390,14 @@ class GaussianPRM:
             Get obstacles in the space
         """
         return self.map.get_obstacles()
+
+    def get_solution_cost(self, solution):
+        """
+            Given solution as Gaussin node indices, compute the transport cost
+            of the swarm.
+            TODO: Implement this 
+        """
+        pass
 
     def get_solution(self, flow_dict, timestep, num_agent):
         """
