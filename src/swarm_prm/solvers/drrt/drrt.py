@@ -8,6 +8,8 @@ import heapq
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
+from scipy.optimize import linear_sum_assignment
 
 from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 from swarm_prm.solvers.utils.spatial_hash import SpatialHash
@@ -30,11 +32,22 @@ class DRRT:
         # Initialize problem instance
         self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
         self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
-        self.ta = TargetAssignment(self.start_agent_count, self.goal_agent_count, self.gaussian_prm)
+
+        # Finding target assignments
+        starts = []
+        for i, g_node in enumerate(self.gaussian_prm.starts):
+            starts.append(g_node.get_mean() * self.start_agent_count[i]) 
+
+        goals = []
+        for i, g_node in enumerate(self.gaussian_prm.goals):
+            goals.append(g_node.get_mean() * self.goal_agent_count[i])
+
+        distance_matrix = cdist(starts, goals)
+        row_ind, col_ind = linear_sum_assignment(distance_matrix)
+        self.target_assignment = [row_ind, col_ind]
 
         # Initialize dRRT 
-
-        self.start, self.goal = self.ta.assign()
+        self.start = [self.gaussian_prm.starts[i] for i in range(self.num_agents)]
             
         self.drrt = {
             "cost": 0,

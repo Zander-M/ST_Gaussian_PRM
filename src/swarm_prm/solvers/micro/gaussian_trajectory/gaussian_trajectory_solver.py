@@ -55,4 +55,5 @@ class GaussianTrajectorySolver:
             Find trajectories per timestep. We find start-goal pairs based on minimizing
             sum of distances between start and goal points.
         """
+        
 
