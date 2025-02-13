@@ -280,7 +280,7 @@ class GaussianPRM:
                              self.gaussian_nodes[simplex[i]],
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method):
-                        self.roadmap.append((simplex[i], simplex[i+1]))
+                        self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
 
         elif roadmap_method == "CVT":
             """
@@ -313,9 +313,8 @@ class GaussianPRM:
 
                 if flow_dict[in_node][out_node] > 0:
                     open.append(out_node)
-                    u, _  = in_node.split("_")
-                    v, t = out_node.split("_")
-                    t = int(t)
+                    u, _  = in_node
+                    v, t = out_node
                     if t not in macro_solution:
                         macro_solution[t] = {}
                     if u not in macro_solution[t]:
@@ -353,7 +352,7 @@ class GaussianPRM:
                             u = v
                             break
                         else:
-                            idx = int(v.split("_")[0])
+                            idx = v[0]
                             paths[-1].append(idx)
                             flow_dict[u][v] -= 1
                             u = v
@@ -383,9 +382,9 @@ class GaussianPRM:
 
             # plot path at each timestep
             for i in node_idx:
-                u = '{}_{}'.format(i, t)
+                u = (i, t)
                 for j in node_idx:
-                    v = '{}_{}'.format(j, t+1)
+                    v = (j, t+1)
                     if v in flow_dict[u] and flow_dict[u][v] != 0:
                         ax.plot([self.samples[i][0], self.samples[j][0]], 
                                 [self.samples[i][1], self.samples[j][1]], 
@@ -402,9 +401,9 @@ class GaussianPRM:
             for t in range(timestep):
                 segments = []
                 for i in node_idx:
-                    u = '{}_{}'.format(i, t)
+                    u = (i, t)
                     for j in node_idx:
-                        v = '{}_{}'.format(j, t+1)
+                        v = (j, t+1)
                         if v in flow_dict[u] and flow_dict[u][v] != 0:
                             # [x, y, capacity]
                             segments.append([

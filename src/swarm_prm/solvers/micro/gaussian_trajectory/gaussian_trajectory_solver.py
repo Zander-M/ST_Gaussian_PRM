@@ -59,22 +59,24 @@ class GaussianTrajectorySolver:
             self.gaussian_candidates.append(np.random.multivariate_normal(mean, cov, 1000))
 
         self.agent_locations = {} # Track current agent locations
-        self.node_agents = {} # Track agents assigned to each node
-        self.agent_assigned = [False for _ in range(self.num_agent)]
+        self.node_agents = defaultdict(list) # Track agents assigned to each node
+        self.agent_assigned = [False] * self.num_agent
 
     def choose_unassigned_agents(self, node_idx, next_node_idx, num_agents):
         """
             Choose agents in node that is not assigned and closest to the next node
         """
+        
         curr_agents = [agent for agent in self.node_agents[node_idx] if not self.agent_assigned[agent]]
-        curr_positions = [self.agent_locations[agent] for agent in curr_agents]
+        curr_positions = np.array([self.agent_locations[agent] for agent in curr_agents])
 
         # Find agents that are closest to the next node
         g_node = self.gaussian_prm.gaussian_nodes[next_node_idx]
         mean = g_node.get_mean()
-        agents = np.argsort(np.linalg.norm(curr_positions - mean))[:num_agents] # Take num_agents closest agents
+        sorted_agents = np.argsort(np.linalg.norm(curr_positions - mean, axis=1)) # Take num_agents closest agents
+        agents = sorted_agents[:num_agents]
         agents_idx = [curr_agents[agent] for agent in agents]
-        return agents_idx, [curr_positions[agent] for agent in agents_idx]
+        return agents_idx, [curr_positions[agent] for agent in agents]
     
 
     def get_node_samples(self, node_idx, node_agent_count):
@@ -94,7 +96,7 @@ class GaussianTrajectorySolver:
         return sample_gaussian(g_node, num_agents, self.ci, self.safety_gap, self.gaussian_candidates[node_idx])
 
 
-    def update_agent_locations(self, agents_idx, agents_positions, gaussian_node_idx, gaussains_samples):
+    def update_agent_locations(self, agents_idx, gaussains_samples):
         """
             Match agents to the node based on the flow graph.
             For each goal locations, we get the # of agents assigned to the node,
@@ -103,6 +105,7 @@ class GaussianTrajectorySolver:
         """
 
         # match agents to the samples based on distances
+        agents_positions = [self.agent_locations[idx] for idx in agents_idx]
         distance_matrix = cdist(agents_positions, gaussains_samples)
         row_ind, col_ind = linear_sum_assignment(distance_matrix)
         matchings = np.stack((row_ind, col_ind), axis=-1)
@@ -126,43 +129,56 @@ class GaussianTrajectorySolver:
         # Initialize agent locations
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             g_node_agent_count[start_idx] += int(self.gaussian_prm.starts_weight[i]*self.num_agent)
-            samples = self.get_node_samples(start_idx, g_node_agent_count)
+            gaussian_samples = self.get_node_samples(start_idx, g_node_agent_count)
 
-            for sample in samples:
+            for sample in gaussian_samples:
                 self.agent_locations[curr_agent_idx] = sample
                 self.node_agents[start_idx].append(curr_agent_idx)
                 curr_agent_idx += 1
         
         for t in range(1, self.timestep+1):
+            print("Time", t)
+
+            # Reset Agent assingment
             self.agent_assigned = [False for _ in range(self.num_agent)]
+
             # compute all Gaussian node # of agents
             incoming_flow = defaultdict(list)
             for u in self.macro_solution[t]:
                 for flow in self.macro_solution[t][u]:
                     g_node_agent_count[flow[0]] += flow[1]
                     g_node_agent_count[u] -= flow[1]
-                    incoming_flow[flow[0]].append(flow)
+                    incoming_flow[flow[0]].append((u, flow[1]))
+            
+            next_node_agents = []
 
             # sample new locations in goal nodes
-            for g_node_idx in incoming_flow.keys():
-                samples = self.get_node_samples(g_node_idx, g_node_agent_count)
-                
+            for gaussian_node_idx in incoming_flow.keys():
+                print("node agent count", g_node_agent_count)
+                gaussian_samples = self.get_node_samples(gaussian_node_idx, g_node_agent_count)
                 incoming_agents = []
-                incoming_agents_locations = []
-                for flow in incoming_flow[g_node_idx]:
-                    agents_idx, agents_positions = self.choose_unassigned_agents(flow[0], g_node_idx, flow[1]) # decide agents in the node
+                for flow in incoming_flow[gaussian_node_idx]:
+                    agents_idx, agents_positions = \
+                        self.choose_unassigned_agents(flow[0], gaussian_node_idx, flow[1]) # decide agents in the node
+
                     incoming_agents += agents_idx
-                    incoming_agents_locations += agents_positions
                     for agent in agents_idx:
                         self.agent_assigned[agent] = True
 
-                # update agents inside the node
-                self.node_agents[g_node_idx] = incoming_agents
-
+                print(len(incoming_agents), len(gaussian_samples))
                 # update agent locations
-                trajectory = self.update_agent_locations(incoming_agents, incoming_flow, g_node_idx, samples)
+                trajectory = self.update_agent_locations(incoming_agents, gaussian_samples)
+
+                # store next step agent list 
+                next_node_agents.append((gaussian_node_idx, incoming_agents))
+
                 for agent_idx, goal in trajectory.items():
                     self.agent_locations[agent_idx] = goal
                     trajectories[agent_idx].append(goal)
+
+            # update next node agents location
+            for node_idx, node_agent in next_node_agents:
+                self.node_agents[node_idx] = node_agent
+            
         return trajectories
     

@@ -63,20 +63,20 @@ class TEGGraph:
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source]['{}_{}'.format(start_idx, 0)] = int(self.gaussian_prm.starts_weight[i]*self.target_flow)
+            teg[super_source][(start_idx, 0)] = int(self.gaussian_prm.starts_weight[i]*self.target_flow)
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg['{}_{}'.format(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+            teg[(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
 
         for t in range(timestep):
             # adding wait edges
             for u in node_idx:
-                teg['{}_{}'.format(u, t)]['{}_{}'.format(u, t+1)] = float("inf")
+                teg[(u, t)][(u, t+1)] = float("inf")
 
             # adding graph edges
             for u in self.roadmap_graph:
                 for v, capacity in self.roadmap_graph[u]:
-                    teg['{}_{}'.format(u, t)]['{}_{}'.format(v, t+1)] = capacity
+                    teg[(u, t)][(v, t+1)] = capacity
 
         return super_source, super_sink, teg 
 
@@ -88,42 +88,42 @@ class TEGGraph:
         super_sink = "SG"
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            del teg['{}_{}'.format(goal_idx, timestep-1)][super_sink] 
-            teg['{}_{}'.format(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+            del teg[(goal_idx, timestep-1)][super_sink] 
+            teg[(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
 
         # update edges
         for u in self.roadmap_graph:
             # adding wait edges
-            teg['{}_{}'.format(u, timestep-1)]['{}_{}'.format(u, timestep)] = float("inf")
+            teg[(u, timestep-1)][(u, timestep)] = float("inf")
             
             # adding graph edges
             for v, capacity in self.roadmap_graph[u]:
-                teg['{}_{}'.format(u, timestep-1)]['{}_{}'.format(v, timestep)] = capacity
+                teg[(u, timestep-1)][(v, timestep)] = capacity
     
         ### Flow Dict
 
         # update edges
         for u in self.roadmap_graph:
             # adding wait edges
-            flow_dict['{}_{}'.format(u, timestep-1)]['{}_{}'.format(u, timestep)] = float("inf")
-            flow_dict['{}_{}'.format(u, timestep)]['{}_{}'.format(u, timestep-1)] = 0
+            flow_dict[(u, timestep-1)][(u, timestep)] = float("inf")
+            flow_dict[(u, timestep)][(u, timestep-1)] = 0
 
             # adding graph edges
             for v, capacity in self.roadmap_graph[u]:
-                flow_dict['{}_{}'.format(u, timestep-1)]['{}_{}'.format(v, timestep)] = capacity
-                flow_dict['{}_{}'.format(v, timestep)]['{}_{}'.format(u, timestep-1)] = 0
+                flow_dict[(u, timestep-1)][(v, timestep)] = capacity
+                flow_dict[(v, timestep)][(u, timestep-1)] = 0
 
         # update goals
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
 
-            flow = flow_dict[super_sink]['{}_{}'.format(goal_idx, timestep-1)]
-            flow_dict['{}_{}'.format(goal_idx, timestep-1)]['{}_{}'.format(goal_idx, timestep)] = float("inf")
-            flow_dict['{}_{}'.format(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow) - flow
-            flow_dict['{}_{}'.format(goal_idx, timestep)]['{}_{}'.format(goal_idx, timestep-1)] = flow 
-            flow_dict[super_sink]['{}_{}'.format(goal_idx, timestep)] = flow
+            flow = flow_dict[super_sink][(goal_idx, timestep-1)]
+            flow_dict[(goal_idx, timestep-1)][(goal_idx, timestep)] = float("inf")
+            flow_dict[(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow) - flow
+            flow_dict[(goal_idx, timestep)][(goal_idx, timestep-1)] = flow 
+            flow_dict[super_sink][(goal_idx, timestep)] = flow
 
-            del flow_dict['{}_{}'.format(goal_idx, timestep-1)][super_sink]
-            del flow_dict[super_sink]['{}_{}'.format(goal_idx, timestep-1)]
+            del flow_dict[(goal_idx, timestep-1)][super_sink]
+            del flow_dict[super_sink][(goal_idx, timestep-1)]
 
     def get_earliest_timestep(self):
         """
