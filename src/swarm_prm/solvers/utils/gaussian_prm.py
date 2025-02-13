@@ -315,6 +315,7 @@ class GaussianPRM:
                     open.append(out_node)
                     u, _  = in_node.split("_")
                     v, t = out_node.split("_")
+                    t = int(t)
                     if t not in macro_solution:
                         macro_solution[t] = {}
                     if u not in macro_solution[t]:
