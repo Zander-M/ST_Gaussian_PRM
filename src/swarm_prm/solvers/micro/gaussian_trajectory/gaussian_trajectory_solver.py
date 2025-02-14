@@ -71,6 +71,7 @@ class GaussianTrajectorySolver:
         curr_positions = np.array([self.agent_locations[agent] for agent in curr_agents])
         if prev_node == 40:
             print(curr_agents)
+        # DEBUG
 
         # Find agents that are closest to the next node
         g_node = self.gaussian_prm.gaussian_nodes[node]
@@ -123,7 +124,7 @@ class GaussianTrajectorySolver:
             sum of distances between start and goal points.
         """
 
-        solution = [[]] * self.num_agent # Store agent-wise trajectories
+        solution = [[] for _ in range(self.num_agent)]
         curr_agent_idx = 0
 
         # Initialize agent locations
@@ -138,6 +139,8 @@ class GaussianTrajectorySolver:
                 curr_agent_idx += 1
         
         for t in range(1, self.timestep+1):
+      
+            print("time", t)
             # Reset Agent assingment
             self.agent_assigned = [False] * self.num_agent
 
@@ -149,10 +152,15 @@ class GaussianTrajectorySolver:
             
             next_node_agents = []
             trajectories = []
+            
+            moving_agents = 0
+            for node in incoming_flow.keys():
+                for flow in incoming_flow[node]:
+                    moving_agents += flow[1]
+            print("moving agents", moving_agents)
 
             # sample new locations in goal nodes
             for node in incoming_flow.keys():
-
                 # gather all agents coming to the same goal
                 incoming_agents = []
                 for prev_node, flow in incoming_flow[node]:

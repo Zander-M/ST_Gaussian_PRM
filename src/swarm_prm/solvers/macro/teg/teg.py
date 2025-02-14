@@ -46,6 +46,10 @@ class TEGGraph:
                                self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
                 graph[u].append((v, capacity))
                 graph[v].append((u, capacity))
+            
+            for i in range(len(self.gaussian_prm.gaussian_nodes)):
+                graph[i].append((i, self.gaussian_prm.gaussian_nodes[i].get_capacity(self.agent_radius)))
+
 
         elif method == "VERTEX_CAPACITY":
             assert False, "Unimplemented roadmap graph construction method."
@@ -70,8 +74,8 @@ class TEGGraph:
 
         for t in range(timestep):
             # adding wait edges
-            for u in node_idx:
-                teg[(u, t)][(u, t+1)] = float("inf")
+            # for u in node_idx:
+                # teg[(u, t)][(u, t+1)] = float("inf")
 
             # adding graph edges
             for u in self.roadmap_graph:
