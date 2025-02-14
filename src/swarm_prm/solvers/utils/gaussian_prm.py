@@ -296,32 +296,28 @@ class GaussianPRM:
         return self.map.get_bounding_polygon_shapely()
 
     def get_macro_solution(self, flow_dict):
-        """
-            Get macro solution containing goals and number of agent at each
-            timestep.
-        """
-        macro_solution =  {}
-        open = list(flow_dict["SS"].keys())
-        while len(open) > 0:
-            in_node = open.pop(0)
-            if in_node == "SG":
-                break
-            for out_node in flow_dict[in_node].keys():
-                if out_node == "SG":
-                    open.append(out_node)
-                    continue
+        macro_solution = {}
 
-                if flow_dict[in_node][out_node] > 0:
-                    open.append(out_node)
-                    u, _  = in_node
-                    v, t = out_node
-                    if t not in macro_solution:
-                        macro_solution[t] = {}
-                    if u not in macro_solution[t]:
-                        macro_solution[t][u] = []
-                    macro_solution[t][u].append((v, flow_dict[in_node][out_node]))
+        for in_node in flow_dict:
+            if in_node in ["SS", "SG"]:
+                continue
+            if not isinstance(in_node, tuple):
+                continue
+
+            u, t = in_node
+            for out_node, flow_value in flow_dict[in_node].items():
+                if flow_value > 0 and isinstance(out_node, tuple):
+                    v, t_next = out_node
+
+                    if t_next not in macro_solution:
+                        macro_solution[t_next] = {}
+                    
+                    if u not in macro_solution[t_next]:
+                        macro_solution[t_next][u] = []
+
+                    macro_solution[t_next][u].append((v, flow_value))
         return macro_solution
-        
+
     def get_obstacles(self):
         """
             Get obstacles in the space
