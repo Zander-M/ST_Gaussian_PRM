@@ -334,17 +334,17 @@ class GaussianPRM:
 
     def get_solution(self, flow_dict, timestep, num_agent):
         """
-            Return macro solution path per agent
+            Return macro solution path per agent in DFS style
         """
         paths = []
-        for _ in range(num_agent):
+        for i in range(num_agent):
             paths.append([])
             u = "SS"
+
             while u != "SG":
                 for v in flow_dict[u]:
                     if flow_dict[u][v] > 0:
                         if v == "SG":
-                            flow_dict[u][v] -= 1
                             u = v
                             break
                         else:
@@ -353,6 +353,8 @@ class GaussianPRM:
                             flow_dict[u][v] -= 1
                             u = v
                             break
+            print("agent", i)
+            print(paths[-1])
 
             # padding paths to solution length, agent waits at goal
             wait_timestep = timestep - len(paths[-1])
