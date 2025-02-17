@@ -340,9 +340,9 @@ class GaussianPRM:
         for i in range(num_agent):
             paths.append([])
             u = "SS"
-
             while u != "SG":
                 for v in flow_dict[u]:
+                    print(v)
                     if flow_dict[u][v] > 0:
                         if v == "SG":
                             u = v
