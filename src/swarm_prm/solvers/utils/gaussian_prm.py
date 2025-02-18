@@ -299,23 +299,23 @@ class GaussianPRM:
         macro_solution = {}
 
         for in_node in flow_dict:
-            if in_node in ["SS", "SG"]:
-                continue
-            if not isinstance(in_node, tuple):
+            if in_node in [("SS", None), ("SG", None)]:
                 continue
 
             u, t = in_node
             for out_node, flow_value in flow_dict[in_node].items():
-                if flow_value > 0 and isinstance(out_node, tuple):
-                    v, t_next = out_node
+                if flow_value > 0:
+                    if out_node == "SG":
+                        continue
+                    v, _ = out_node
 
-                    if t_next not in macro_solution:
-                        macro_solution[t_next] = {}
+                    if t not in macro_solution:
+                        macro_solution[t] = {}
                     
-                    if u not in macro_solution[t_next]:
-                        macro_solution[t_next][u] = []
+                    if u not in macro_solution[t]:
+                        macro_solution[t][u] = []
 
-                    macro_solution[t_next][u].append((v, flow_value))
+                    macro_solution[t][u].append((v, flow_value))
         return macro_solution
 
     def get_obstacles(self):
@@ -339,12 +339,11 @@ class GaussianPRM:
         paths = []
         for i in range(num_agent):
             paths.append([])
-            u = "SS"
-            while u != "SG":
+            u = ("SS", None) 
+            while u != ("SG", None):
                 for v in flow_dict[u]:
-                    print(v)
                     if flow_dict[u][v] > 0:
-                        if v == "SG":
+                        if v == ("SG", None):
                             u = v
                             break
                         else:
@@ -366,9 +365,9 @@ class GaussianPRM:
         for path in paths:
             simple_paths.append([self.samples[i] for i in path])
             gaussian_paths.append([self.gaussian_nodes[i] for i in path])
-            
-
         return simple_paths, gaussian_paths
+
+# Visualization functions
 
     def visualize_solution(self, flow_dict, timestep, num_agent):
         """
@@ -438,8 +437,6 @@ class GaussianPRM:
         anim = FuncAnimation(fig, update, frames=timestep, init_func=init,
                              blit=True, interval=100)
         anim.save("test_solution_path.gif", writer='pillow', fps=6)
-
-    # Visualization functions
 
     def visualize_roadmap(self, fname="test_gaussian_prm"):
         """

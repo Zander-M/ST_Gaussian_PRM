@@ -72,9 +72,9 @@ class TEGGraphVertex:
         """
             Build TEG based on timestep
         """
-        teg = defaultdict(dd)
-        super_source = "SS"
-        super_sink = "SG"
+        teg = defaultdict(dict)
+        super_source = ("SS", None, OUT_NODE)
+        super_sink = ("SG", None, IN_NODE)
 
         # Adding super source and super goal to the graph
 
@@ -107,12 +107,11 @@ class TEGGraphVertex:
                 residual_graph[v][u] = 0
         return residual_graph
 
-    def update_teg_residual_dict(self, teg, residual_dict, timestep):
+    def update_teg_residual_dict(self, teg, residual_dict, timestep, super_sink):
         """
             Update TEG and Residual Dict for one timestep from previous timestep 
         """
         ### TEG
-        super_sink = "SG"
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
@@ -122,8 +121,7 @@ class TEGGraphVertex:
         # update edges
         for u in self.roadmap_graph:
             for v in self.roadmap_graph[u]:
-
-                teg[(u, timestep-1, OUT_NODE)][(u, timestep, IN_NODE)] = float("inf")
+                teg[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
                 teg[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = \
                     self.node_capacity[v]
     
@@ -165,18 +163,16 @@ class TEGGraphVertex:
 
         paths = []
         while timestep < self.max_timestep:
-            max_flow, residual_graph, new_paths = MaxFlowSolver(teg, super_source, super_sink, 
+            max_flow, residual_graph = MaxFlowSolver(teg, super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
-            print("timestep:", timestep, "max_flow:", max_flow)
-            paths += new_paths
-
+            # print("timestep:", timestep, "max_flow:", max_flow)
+            print("Time step: ", timestep, "Max Flow: ", max_flow)
             # by construction the max flow will not exceed the target flow
             if max_flow == self.target_flow:
                 flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                return max_flow, flow_dict, timestep, teg, paths 
-            else:
-                timestep += 1
-            self.update_teg_residual_dict(teg, residual_graph, timestep)
+                return max_flow, flow_dict, timestep, teg, paths, residual_graph
+            timestep += 1
+            self.update_teg_residual_dict(teg, residual_graph, timestep, super_sink)
 
         return None, None, None, None, None
     
@@ -184,26 +180,14 @@ class TEGGraphVertex:
         """
             Construct forward flow graph from residual graph
         """
-        flow_dict = dict()
+        flow_dict = defaultdict(dict)
+        
         for u in teg:
             # we only look at out-node - in-node edges
-            if u == "SS":
+            if u[-1] == OUT_NODE:
                 for v in teg[u]:
                     flow = residual[v][u]
                     if flow > 0:
-                        if u not in flow_dict:
-                            flow_dict[u] = dict()
-                        flow_dict[u][v[0], v[1]] = flow
-
-            elif u[-1] == OUT_NODE:
-                for v in teg[u]:
-                    flow = residual[v][u]
-                    if flow > 0:
-                        if (u[0], u[1]) not in flow_dict:
-                            flow_dict[(u[0], u[1])] = dict()
-                        if v == "SG":
-                            flow_dict[(u[0], u[1])]["SG"] = flow
-                        else:
                             flow_dict[(u[0], u[1])][(v[0], v[1])] = flow
             
         return flow_dict

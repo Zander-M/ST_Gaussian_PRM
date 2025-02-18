@@ -42,11 +42,13 @@ class GaussianTrajectorySolver:
 
     def __init__(self, gaussian_prm:GaussianPRM, macro_solution, timestep,
                     num_agent, safety_gap = 0.2, ci=0.8,
+                    interpolation_count=10
                  ):
         self.gaussian_prm = gaussian_prm 
         self.macro_solution = macro_solution
         self.timestep = timestep
         self.num_agent = num_agent
+        self.interpolation_count = interpolation_count
 
         # Gaussian Sampling Parameters
         self.safety_gap = safety_gap
@@ -69,9 +71,6 @@ class GaussianTrajectorySolver:
 
         curr_agents = [agent for agent in self.node_agents[prev_node] if not self.agent_assigned[agent]]
         curr_positions = np.array([self.agent_locations[agent] for agent in curr_agents])
-        if prev_node == 40:
-            print(curr_agents)
-        # DEBUG
 
         # Find agents that are closest to the next node
         g_node = self.gaussian_prm.gaussian_nodes[node]
@@ -81,7 +80,6 @@ class GaussianTrajectorySolver:
         agents_idx = [curr_agents[agent] for agent in agents]
         return agents_idx
     
-
     def get_node_samples(self, node_idx, num_agents):
         """
             Sample points in the Gaussian Node according to the # of agents
@@ -138,9 +136,8 @@ class GaussianTrajectorySolver:
                 self.node_agents[start_idx].append(curr_agent_idx)
                 curr_agent_idx += 1
         
-        for t in range(1, self.timestep+1):
+        for t in range(self.timestep):
       
-            print("time", t)
             # Reset Agent assingment
             self.agent_assigned = [False] * self.num_agent
 
@@ -157,7 +154,6 @@ class GaussianTrajectorySolver:
             for node in incoming_flow.keys():
                 for flow in incoming_flow[node]:
                     moving_agents += flow[1]
-            print("moving agents", moving_agents)
 
             # sample new locations in goal nodes
             for node in incoming_flow.keys():
@@ -177,7 +173,6 @@ class GaussianTrajectorySolver:
                 # store next step agent list 
                 next_node_agents.append((node, incoming_agents))
 
-
             # update next node agents location
             for node_idx, node_agent in next_node_agents:
                 self.node_agents[node_idx] = node_agent
@@ -186,5 +181,6 @@ class GaussianTrajectorySolver:
                 for agent_idx, goal in trajectory.items():
                     self.agent_locations[agent_idx] = goal
                     solution[agent_idx].append(goal)
+            
         return solution
     

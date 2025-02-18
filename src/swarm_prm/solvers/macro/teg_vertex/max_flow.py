@@ -9,7 +9,7 @@ class MaxFlowSolver:
         Max Flow Solver that can reuse residual graphs.
     """
     def __init__(self, graph, start, goal, 
-                 residual_graph=None, initial_flow=0.,
+                 residual_graph, initial_flow=0.,
                  search_method="EK") -> None:
         """
             Max flow
@@ -131,6 +131,7 @@ class MaxFlowSolver:
             Update flow graph
         """
         for u, v in zip(path[:-1], path[1:]):
+            assert flow > 0
             self.residual_graph[u][v] -= flow
             self.residual_graph[v][u] += flow
     
@@ -143,19 +144,16 @@ class MaxFlowSolver:
                 Edmond Karp 
             """
             total_flow = self.initial_flow
-            paths = []
 
             while True:
                 path, flow = self.bidirectional_bfs()
                 if not path:
                     break
                 self.update_flow(path, flow)
-                for _ in range(int(flow)):
-                    paths.append(path)
 
                 total_flow += flow
 
-            return total_flow, self.residual_graph, paths
+            return total_flow, self.residual_graph 
 
         elif self.search_method== "BS":
             """
