@@ -1,34 +1,36 @@
 """
-    Voronoi Utils
+    CVT Utils
 """
 import cvxpy as cp
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import Voronoi
+from scipy.stats import chi2
+from shapely.affinity import affine_transform
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
+
+from swarm_prm.solvers.utils.gaussian_utils import GaussianGraphNode
 
 class CVT:
     """
         Centroidal Voronoi Tessellation
     """
-    def __init__(self, roadmap, num_samples=200, iteration=10, cvar_threshold=0.95):
+    def __init__(self, roadmap, num_samples=200, iteration=100, confidence_interval=0.95):
 
         self.roadmap = roadmap
         self.num_samples = num_samples
         self.iteration = iteration
-
-        # determine the CVaR threshold as the Gaussian Nodes equiprobable lines wrt the ellipsoids
-        self.cvar_threshold = cvar_threshold 
+        self.confidence_interval = confidence_interval
     
-    def _compute_centroids(self, vor, points):
+    def compute_centroids(self, vor, points):
         """
         Compute centroids of the Voronoi cells that do not intersect with obstacles.
         Keep original points for cells that do intersect or go outside the bounding polygon.
         """
 
-        bounding_polygon = self.roadmap.get_bounding_polygon
-        obstacles = self.roadmap.get_obstacles
+        bounding_polygon = self.roadmap.get_bounding_polygon()
+        obstacles = [obs.geom for obs in self.roadmap.get_obstacles()]
 
         new_points = []
         for point, region_index in zip(points, vor.point_region):
@@ -58,32 +60,60 @@ class CVT:
                         new_points.append(closest_point.coords[0])
                 else:
                     new_points.append(point)  # Fallback to original point if invalid
-
         return np.array(new_points)
     
-    def get_gaussian_nodes(self, A_matrix, center):
-        """
-            Get the Gaussian nodes based on Ellipsoid A_matrix and center
-        """
-        
     def get_CVT(self):
         """
             Return the centroids and the ellipsoids
         """
         np.random.seed(0)
-        width = self.roadmap.size[0]
-        height = self.roadmap.size[1]
+
+        samples = []
+        g_nodes = []
+
+        width = self.roadmap.width
+        height = self.roadmap.height
+        obstacles = [obs.geom for obs in self.roadmap.get_obstacles()]
+
 
         x = np.random.uniform(0, width, self.num_samples)
         y = np.random.uniform(0, height, self.num_samples)
         points = np.column_stack((x, y))
+        voronoi = Voronoi(points)
         for _ in range(self.iteration):
+            points = self.compute_centroids(voronoi, points)
             voronoi = Voronoi(points)
-            points = self._compute_centroids(voronoi, points)
-        
-        # Compute the ellipsoids
 
-    def get_polygon_inequalities(self, polygon: Polygon):
+        for region_idx in voronoi.regions:
+            if not region_idx or -1 in region_idx:
+                continue
+            
+            region = [voronoi.vertices[i] for i in region_idx]
+            cell_polygon = Polygon(region)
+            if any(cell_polygon.intersects(obs) for obs in obstacles):
+                continue
+
+            if cell_polygon.is_valid and not cell_polygon.is_empty:
+                x, y = cell_polygon.exterior.xy
+                B, d = johns_ellipsoid_edge_constraints(cell_polygon)
+
+                # convert ellipsoid into Gaussian Node
+
+                chi2_val = chi2.ppf(self.confidence_interval, df=2)
+                mean = d
+                assert B[0] is not None, "Invalid polygon."
+
+                cov = B.T @ B / chi2_val
+                samples.append(np.array(mean))
+                g_nodes.append(GaussianGraphNode(mean, cov))
+        
+        return samples, g_nodes
+
+                
+    
+# Polygon -> Gaussian Functions
+
+def get_polygon_inequalities(polygon: Polygon):
         """
         Computes the inequality constraints (Ax ≤ b) for a convex polygon.
         Returns:
@@ -98,52 +128,59 @@ class CVT:
         b = np.sum(normals * vertices[:-1], axis=1)  # Compute b = a_i^T v_i
         return normals, b
 
+def get_normalized_polygon(polygon: Polygon, scale=10):
+    """
+    Normalize a polygon to the unit circle.
+    """
+    polygon = orient(polygon, sign=1.0)  # Ensure counter-clockwise orientation
+    centroid = np.array(polygon.centroid.xy)
+    bounds = np.array(polygon.bounds)
+    x_scale = bounds[2] - bounds[0] 
+    y_scale = bounds[3] - bounds[1] 
+    transform_matrix = np.array((scale / x_scale, scale / y_scale))
+    offset = np.array([-centroid[0]* scale/x_scale , -centroid[1] * scale/y_scale])
+    return affine_transform(polygon, [scale /x_scale, 0, 0, scale/y_scale, offset[0], offset[1]]), transform_matrix, offset, scale
 
-    def johns_ellipsoid_edge_constraints(self, polygon: Polygon):
-        """
-            Computes John's Ellipsoid (largest inscribed ellipsoid) for a convex polygon using CVXPY
-            with polygon edge constraints instead of vertex constraints.
-        """
-
-        A, b = self.get_polygon_inequalities(polygon)  # Compute polygon inequalities
-        d = A.shape[1]  # Dimension (should be 2 for 2D)
-
-        # Define optimization variables
-        P = cp.Variable((d, d), symmetric=True)  # Instead of A^-1, use P as auxiliary matrix
-        c = cp.Variable((d, ))  # Center of the ellipsoid
-        t = cp.Variable()  # Scaling factor to ensure the ellipsoid is inside the polygon
-
-        # Ensure P is positive semi-definite
-        constraints = [cp.PSD(P)]
-
-        # Edge constraints: max_{x ∈ E} a_i^T x ≤ b_i
-        for i in range(A.shape[0]):
-            constraints.append(cp.norm(P @ A[i]) <= b[i] - A[i] @ c)  # Equivalent to a_i^T x ≤ b_i
-
-        # Objective: Maximize log(det(P)), equivalent to maximizing log(det(A))
-        obj = cp.Maximize(cp.log_det(P))
-
-        # Solve the convex optimization problem
-        prob = cp.Problem(obj, constraints)
-        prob.solve()
-
-        if prob.status in ["optimal", "optimal_inaccurate"]:
-            P_value = P.value
-            # A_value = np.linalg.inv(P_value) if P_value is not None else None  # Recover A from P^-1
-            A_value = P.value
-
-            return c.value, A_value
-        else:
-            print(prob.status)
-            raise ValueError("Optimization failed.")
+def johns_ellipsoid_edge_constraints(polygon: Polygon):
+    """
+    Computes John's Ellipsoid (largest inscribed ellipsoid) for a convex polygon using CVXPY
+    with polygon edge constraints instead of vertex constraints.
+    """
     
-    def get_gaussian_roadmap(self):
-        """
-            Get the Gaussian roadmap
-        """
+    normalized_polygon, transform_matrix, offset, scale = get_normalized_polygon(polygon)
+    A, b = get_polygon_inequalities(normalized_polygon)  # Compute polygon inequalities
+    dim = A.shape[1]  # Dimension (should be 2 for 2D)
 
-        return 
-        
+    # Define optimization variables
+    B = cp.Variable((dim, dim), symmetric=True)  
+    
+    d = cp.Variable((dim,))  # Center of the ellipsoid
+
+    # Ensure P is positive definite
+    constraints = [ B >> 1e-3 * np.eye(dim)]
+
+    # Edge constraints: max_{x ∈ E} a_i^T x ≤ b_i
+    for i in range(A.shape[0]):
+        constraints.append(cp.norm(B @ A[i].T, 2) <= b[i] - A[i].T @ d) 
+
+    # log det (B^-1) = -log det (B)
+    obj = cp.Maximize(cp.log_det(B))
+
+    # Solve the convex optimization problem
+    prob = cp.Problem(obj, constraints)
+    prob.solve()
+
+    if prob.status in ["optimal", "optimal_inaccurate"]:
+        # Transform the ellipsoid back to the original space
+        t = np.diag(1/transform_matrix)
+        return t@B.value, -t@(offset.squeeze() - d.value)
+
+    else:
+        print(prob.status)
+        return None, None
+
+# Visualization Functions
+
 def plot_ellipsoid(ax, center, A_matrix, color='r'):
     """
         Plot ellipsoid
@@ -157,7 +194,6 @@ def plot_ellipsoid(ax, center, A_matrix, color='r'):
 
     ax.plot(ellipse[0, :], ellipse[1, :], color)
 
-# Visualization Functions
 def plot_voronoi(voronoi, bounding_polygon, obstacles):
     """
         Plot Voronoi and inscribed ellipsoids

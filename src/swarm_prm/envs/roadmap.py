@@ -15,7 +15,7 @@ from swarm_prm.solvers.utils.gaussian_utils import GaussianNode
 
 ##### Map       #####
 
-class Map:
+class Roadmap:
     def __init__(self, width, height, map_name=None) -> None:
         self.width = width
         self.height = height
@@ -51,7 +51,7 @@ class Map:
         dist = [obs.get_dist(point) for obs in self.obstacles]
         return self.obstacles[np.argsort(dist)[0]]
 
-    def get_bounding_polygon_shapely(self):
+    def get_bounding_polygon(self):
         """
            Get bounding polygon of the space 
         """
@@ -138,6 +138,7 @@ class Map:
         """
         mean1, cov1 = start.get_gaussian()
         mean2, cov2 = goal.get_gaussian()
+
         for step in range(num_samples):
             mean = (step/num_samples)* mean1 + (1-(step/num_samples)) * mean2 
             cov = (step/num_samples)* cov1 + (1-(step/num_samples)) * cov2 
@@ -380,7 +381,7 @@ class MapGenerator:
         self.roadmaps = []
         for i in range(self.roadmap_count):
             self.roadmap_names.append("{}_{:01d}.yaml".format(self.roadmap_fname, i))
-            map_instance = Map(self.width, self.height)
+            map_instance = Roadmap(self.width, self.height)
             self.add_obstacles(map_instance)
             self.roadmaps.append(map_instance)
 
@@ -431,7 +432,7 @@ class MapLoader:
         with open(fname, "r") as f:
             data = f.read()
         map_dict = yaml.load(data, Loader=yaml.SafeLoader)
-        roadmap = Map(map_dict["width"], map_dict["height"])
+        roadmap = Roadmap(map_dict["width"], map_dict["height"])
         for obs in map_dict["obstacles"]:
             roadmap.add_obstacle(Obstacle([obs["x"], obs["y"]], "CIRCLE", obs["radius"]))
         self.map = roadmap

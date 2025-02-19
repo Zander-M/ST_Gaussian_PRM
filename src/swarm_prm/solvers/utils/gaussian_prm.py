@@ -13,7 +13,7 @@ from shapely.geometry import Point, Polygon
 
 from swarm_prm.solvers.utils.gaussian_utils import *
 from swarm_prm.envs.instance import Instance
-from swarm_prm.solvers.utils import CVT
+from swarm_prm.solvers.utils.CVT import CVT
 
 class GaussianPRM:
     """
@@ -104,13 +104,14 @@ class GaussianPRM:
                     g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                     self.samples.append(node)
                     self.gaussian_nodes.append(g_node)
+
         elif sampling_strategy == "CVT":
             """
                 Perform Centroidal Voronoi Tesellation for choosing 
                 Gaussian Points
             """
-            pass
-            
+            cvt_instance = CVT(self.map, self.num_samples)
+            self.samples, self.gaussian_nodes = cvt_instance.get_CVT()
 
         elif sampling_strategy == "UNIFORM_WITH_RADIUS":
             min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
@@ -197,13 +198,6 @@ class GaussianPRM:
                                                       ):
                     self.samples.append(mean)
                     self.gaussian_nodes.append(g_node)
-
-        elif sampling_strategy == "CVT":
-            """
-                Use CVT to find centroids for each Voronoi cell. Choose the 
-                largest circle that fits in each cell to set the Gaussian mean
-                and covariance.
-            """
             
         elif sampling_strategy == "HEXAGON":
             """
@@ -276,24 +270,21 @@ class GaussianPRM:
                     if (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
                         and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
+                        and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
+                                                           self.gaussian_nodes[simplex[i+1]].mean) \
                         and not self.map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[simplex[i]],
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method):
                         self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
 
-        elif roadmap_method == "CVT":
-            """
-                Construct roadmap by creating voronoi cells based on sampled points
-            """
-            cvt_instance = CVT(self.samples, self.map.width, self.map.height, self.cvt_iteration)
-            pass
+
 
     def get_bounding_polygon(self):
         """
             Get bounding polygons of the map
         """
-        return self.map.get_bounding_polygon_shapely()
+        return self.map.get_bounding_polygon()
 
     def get_macro_solution(self, flow_dict):
         macro_solution = {}
@@ -352,8 +343,6 @@ class GaussianPRM:
                             flow_dict[u][v] -= 1
                             u = v
                             break
-            print("agent", i)
-            print(paths[-1])
 
             # padding paths to solution length, agent waits at goal
             wait_timestep = timestep - len(paths[-1])

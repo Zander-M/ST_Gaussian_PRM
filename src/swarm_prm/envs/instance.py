@@ -7,13 +7,13 @@ import os
 from typing import List
 import yaml
 
-from swarm_prm.envs.map import Map, MapLoader
+from swarm_prm.envs.roadmap import Roadmap, MapLoader
 from swarm_prm.solvers.utils.gaussian_utils import GaussianGraphNode
 
 ##### Instance #####
 
 class Instance:
-    def __init__(self, map:Map, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode],
+    def __init__(self, map:Roadmap, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode],
                  starts_weight, goals_weight, num_agent) -> None:
         self.map = map
         self.starts = starts
@@ -47,7 +47,7 @@ class Instance:
 ##### Instance Generator #####
 
 class InstanceGenerator:
-    def __init__(self, map:Map, num_agents, num_starts, num_goals, agent_radius=5,
+    def __init__(self, map:Roadmap, num_agents, num_starts, num_goals, agent_radius=5,
                  instance_count=10, instance_dir="data/envs/instances") -> None:
 
         self.roadmap = map
