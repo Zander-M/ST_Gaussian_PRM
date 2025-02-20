@@ -56,12 +56,37 @@ class Roadmap:
            Get bounding polygon of the space 
         """
         return Polygon([(0, 0), (self.width, 0), (self.width, self.height), (0, self.height)])
+    
+    def get_bounding_points(self, segment_length):
+        """
+            Get point on the bounding segments
+        """
+
+        bounding_polygon = self.get_bounding_polygon()
+        all_pts = []
+
+        # Extract and split each edge of the polygon
+        for i in range(len(bounding_polygon.exterior.coords) - 1):
+            # Each edge of the polygon as a LineString
+            edge = LineString([bounding_polygon.exterior.coords[i], bounding_polygon.exterior.coords[i + 1]])
+            pts = _split_edge(edge, segment_length)
+            all_pts.extend(pts)  
+        return np.stack(all_pts)
 
     def get_obstacles(self):
         """
             Return obstacles
         """
         return self.obstacles
+    
+    def get_boundary_points(self, segment_length):
+        """
+            Return points on the boundary of the roadmap
+        """
+        points = self.get_bounding_points(segment_length)
+        for obs in self.obstacles:
+            points = np.concat([points, obs.get_edge_segments(segment_length)])
+        return points
     
     def get_obstacles_shapely(self):
         """
@@ -274,23 +299,10 @@ class Obstacle:
             i = np.arange(n_points)
             theta = np.linspace(0, 2 * np.pi, n_points, endpoint=False)
             pts = np.stack([np.cos(theta), np.sin(theta)], axis=1) * self.radius + self.get_pos()
-            segs = np.stack([i, i+1], axis=1) % n_points
-            return pts, segs, self.get_pos()
+            return pts 
 
         elif self.obs_type == "POLYGON":
 
-            def _split_edge(edge, segment_length):
-                """Split a LineString edge into segments of specified length."""
-                pts = []
-
-                num_segments = int(edge.length // segment_length)
-                if edge.length % segment_length != 0:
-                    num_segments += 1
-                # Create each segment
-                for i in range(num_segments):
-                    pts.append(np.array(edge.interpolate(i * segment_length).xy).reshape(2))
-
-                return pts
             all_pts = []
 
             # Extract and split each edge of the polygon
@@ -299,12 +311,7 @@ class Obstacle:
                 edge = LineString([self.geom.exterior.coords[i], self.geom.exterior.coords[i + 1]])
                 pts = _split_edge(edge, segment_length)
                 all_pts.extend(pts)          
-
-            idx = np.arange(len(all_pts))
-
-            segs = np.stack([idx, idx+1], axis=1) % len(all_pts)
-
-            return np.array(all_pts), segs, self.get_pos()
+            return np.stack(all_pts)
         else: 
             assert False, "Unimplemented obstacle type."
 
@@ -442,3 +449,18 @@ class MapLoader:
             Get roadmap
         """
         return self.map
+
+### Helper functions
+
+def _split_edge(edge, segment_length):
+    """Split a LineString edge into segments of specified length."""
+    pts = []
+
+    num_segments = int(edge.length // segment_length)
+    if edge.length % segment_length != 0:
+        num_segments += 1
+    # Create each segment
+    for i in range(num_segments):
+        pts.append(np.array(edge.interpolate(i * segment_length).xy).reshape(2))
+
+    return pts

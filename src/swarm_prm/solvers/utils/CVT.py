@@ -16,12 +16,15 @@ class CVT:
     """
         Centroidal Voronoi Tessellation
     """
-    def __init__(self, roadmap, num_samples=200, iteration=100, confidence_interval=0.95):
+    def __init__(self, roadmap, num_samples=200, iteration=100, 
+                 confidence_interval=0.95,
+                 segment_length=3):
 
         self.roadmap = roadmap
         self.num_samples = num_samples
         self.iteration = iteration
         self.confidence_interval = confidence_interval
+        self.segment_length = segment_length
     
     def compute_centroids(self, vor, points):
         """
@@ -75,15 +78,21 @@ class CVT:
         height = self.roadmap.height
         obstacles = [obs.geom for obs in self.roadmap.get_obstacles()]
 
+        points = []
+        while len(points) < self.num_samples:
+            point = (np.random.rand()*width, np.random.rand()*height)
+            if self.roadmap.is_point_collision(point):
+                point = (np.random.rand()*width, np.random.rand()*height)
+            points.append(point)
+        points = np.array(points)
 
-        x = np.random.uniform(0, width, self.num_samples)
-        y = np.random.uniform(0, height, self.num_samples)
-        points = np.column_stack((x, y))
-        voronoi = Voronoi(points)
+        boundary_points = self.roadmap.get_boundary_points(self.segment_length)
+        points = np.concat([points, boundary_points])
         for _ in range(self.iteration):
-            points = self.compute_centroids(voronoi, points)
             voronoi = Voronoi(points)
+            points = self.compute_centroids(voronoi, points)
 
+        voronoi = Voronoi(points)
         for region_idx in voronoi.regions:
             if not region_idx or -1 in region_idx:
                 continue
@@ -102,7 +111,6 @@ class CVT:
                 chi2_val = chi2.ppf(self.confidence_interval, df=2)
                 mean = d
                 assert B[0] is not None, "Invalid polygon."
-
                 cov = B.T @ B / chi2_val
                 samples.append(np.array(mean))
                 g_nodes.append(GaussianGraphNode(mean, cov))
