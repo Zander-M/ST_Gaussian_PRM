@@ -3,17 +3,19 @@
     https://arxiv.org/pdf/1903.00994
     This version does not have rewiring behavior
 """
+from collections import defaultdict
 
 import numpy as np
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
+import time
 
 from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 
 class DRRT:
     def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, 
-                 connect_radius=10, max_iter=30000):
+                 connect_radius=10, max_time=6000):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -25,7 +27,8 @@ class DRRT:
         self.num_agents = num_agents
         self.kd_tree = KDTree(self.nodes)
         self.roadmap = self.gaussian_prm.map
-        self.max_iter = max_iter
+        self.roadmap_neighbors = self.build_neighbors()
+        self.max_time = max_time
         self.agent_radius = agent_radius
         self.connect_radius = connect_radius
 
@@ -53,6 +56,19 @@ class DRRT:
 
         self.cost = {self.current_agent_node_idx:0} # cost
         self.tree = {self.current_agent_node_idx: None} # parent
+
+    def build_neighbors(self):
+        """
+            Get neighbor states
+        """
+        graph = defaultdict(list)
+
+        for edge in self.gaussian_prm.roadmap:
+            u, v = edge
+            graph[u].append(v)
+            graph[v].append(u)
+
+        return graph
 
     def connect_to_target(self, goal_state):
         """
@@ -106,7 +122,7 @@ class DRRT:
             current_pos = self.gaussian_prm.samples[v_near[agent]]
             random_dir_vec = (q_rand[agent] - current_pos)  
             random_dir_vec = random_dir_vec/np.linalg.norm(random_dir_vec)
-            neighbors = self.kd_tree.query_ball_point(current_pos, self.connect_radius)
+            neighbors = self.roadmap_neighbors[v_near[agent]]
             cos_sim = []
             for neighbor in neighbors[1:]:
                 dir_vec = self.nodes[neighbor] - current_pos
@@ -155,14 +171,14 @@ class DRRT:
         }
 
         goal_state = self.get_assignment()
-        print("Goal", goal_state)
-
-        for _ in range(self.max_iter):
+        start_time = time.time()
+        while time.time() - start_time < self.max_time:
             self.expand()
             if goal_state in self.visited_states:
                 path = self.connect_to_target(goal_state)
+                print("Found solution")
                 return path, self.cost
-        print("exceeded max iter")
+        print("exceeded run time")
         print(self.visited_states)
         return None, None
 
