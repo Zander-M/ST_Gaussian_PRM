@@ -11,11 +11,13 @@ from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 import time
 
+np.random.seed(0)
+
 from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 
 class DRRT:
     def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, 
-                 connect_radius=10, max_time=6000):
+                 goal_state_prob=0.1, max_time=6000):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -30,14 +32,15 @@ class DRRT:
         self.roadmap_neighbors = self.build_neighbors()
         self.max_time = max_time
         self.agent_radius = agent_radius
-        self.connect_radius = connect_radius
+        self.goal_state_prob = goal_state_prob
 
         # Initialize problem instance
         self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
         self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
 
+        self.goal_state = self.get_assignment()
+
         # Finding target assignments
-        
 
         self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
@@ -50,7 +53,7 @@ class DRRT:
             self.current_agent_node_idx += [start_idx] * self.start_agent_count[i]
         self.current_agent_node_idx = tuple(self.current_agent_node_idx)
 
-        self.visited_states = [self.current_agent_node_idx]
+        self.visited_states = {self.current_agent_node_idx}
         
         # DRRT structure 
 
@@ -85,12 +88,15 @@ class DRRT:
         """
             Expand DRRT 
         """
-        q_rand = np.random.rand(self.num_agents, 2) \
-            * np.array([self.roadmap.width, self.roadmap.height])
+        if np.random.rand() < self.goal_state_prob:
+            q_rand = np.array([self.nodes[idx] for idx in self.goal_state])
+        else: 
+            q_rand = np.random.rand(self.num_agents, 2) \
+                * np.array([self.roadmap.width, self.roadmap.height])
         v_near = self.nearest_neighbor(q_rand)
         v_new = self.Id(v_near, q_rand)
         if v_new not in self.visited_states:
-            self.visited_states.append(v_new) # add vertex
+            self.visited_states.add(v_new) # add vertex
             self.tree[v_new] = v_near # type:ignore # add edge
         
     def nearest_neighbor(self, random_state):
@@ -98,14 +104,14 @@ class DRRT:
             Find Nearest Neighbor in the tree
         """
         min_dist = float("inf")
-        min_idx = -1
-        for i, state in enumerate(self.visited_states):
+        min_state = None 
+        for state in self.visited_states:
             positions = np.array([self.nodes[node_idx] for node_idx in state])
             dist = np.sum(np.linalg.norm(random_state-positions, axis=1))
             if dist < min_dist:
                 min_dist = dist
-                min_idx = i
-        return self.visited_states[min_idx]
+                min_state = state
+        return min_state
 
     def get_cost(self, node):
         """
@@ -121,7 +127,11 @@ class DRRT:
         for agent in range(self.num_agents):
             current_pos = self.gaussian_prm.samples[v_near[agent]]
             random_dir_vec = (q_rand[agent] - current_pos)  
-            random_dir_vec = random_dir_vec/np.linalg.norm(random_dir_vec)
+            random_dir_vec_norm = np.linalg.norm(random_dir_vec)
+            if random_dir_vec_norm == 0:
+                random_dir_vec = np.zeros_like(random_dir_vec)
+            else:
+                random_dir_vec = random_dir_vec/np.linalg.norm(random_dir_vec)
             neighbors = self.roadmap_neighbors[v_near[agent]]
             cos_sim = []
             for neighbor in neighbors[1:]:
@@ -149,33 +159,30 @@ class DRRT:
         """
         starts = []
         for i, g_node in enumerate(self.gaussian_prm.starts):
-            starts.append(g_node.get_mean() * self.start_agent_count[i]) 
+            starts += [g_node.get_mean()] * self.start_agent_count[i] 
 
         goals = []
+        goals_idx = []
         for i, g_node in enumerate(self.gaussian_prm.goals):
-            goals.append(g_node.get_mean() * self.goal_agent_count[i])
+            goals += [g_node.get_mean()] * self.goal_agent_count[i]
+            goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goal_agent_count[i]
 
         distance_matrix = cdist(starts, goals)
         _, col_ind = linear_sum_assignment(distance_matrix)
-        goal_state = tuple([self.gaussian_prm.goals_idx[idx] for idx in col_ind])
+
+        goal_state = tuple([goals_idx[idx] for idx in col_ind])
         return goal_state
 
     def get_solution(self):
         """
             Get solution per agent
         """
-        current_state = {
-            "parent": None,
-            "state": self.current_agent_node_idx,
-            "cost": 0
-        }
 
-        goal_state = self.get_assignment()
         start_time = time.time()
         while time.time() - start_time < self.max_time:
             self.expand()
-            if goal_state in self.visited_states:
-                path = self.connect_to_target(goal_state)
+            if self.goal_state in self.visited_states:
+                path = self.connect_to_target(self.goal_state)
                 print("Found solution")
                 return path, self.cost
         print("exceeded run time")
