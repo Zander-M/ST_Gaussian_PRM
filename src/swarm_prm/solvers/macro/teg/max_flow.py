@@ -9,7 +9,7 @@ class MaxFlowSolver:
         Max Flow Solver that can reuse residual graphs.
     """
     def __init__(self, graph, start, goal, 
-                 residual_graph=None, initial_flow=0.,
+                 residual_graph, initial_flow=0.,
                  search_method="EK") -> None:
         """
             Max flow
@@ -18,23 +18,12 @@ class MaxFlowSolver:
         self.search_method = search_method
 
         # reuse previous search result if possible
-        self.residual_graph = residual_graph if residual_graph else self.build_residual_graph()
+        self.residual_graph = residual_graph 
 
         # if provided residual graph, update initial flow
         self.initial_flow = initial_flow
         self.start = start
         self.goal = goal
-    
-    def build_residual_graph(self):
-        """
-            Build Augment Graph
-        """
-        augment_graph = defaultdict(lambda:dict())
-        for u in self.graph:
-            for v in self.graph[u]:
-                augment_graph[u][v] = self.graph[u][v]
-                augment_graph[v][u] = 0
-        return augment_graph
     
     def build_forward_bound(self):
         """
@@ -142,6 +131,7 @@ class MaxFlowSolver:
             Update flow graph
         """
         for u, v in zip(path[:-1], path[1:]):
+            assert flow > 0
             self.residual_graph[u][v] -= flow
             self.residual_graph[v][u] += flow
     
@@ -163,7 +153,7 @@ class MaxFlowSolver:
 
                 total_flow += flow
 
-            return total_flow, self.residual_graph
+            return total_flow, self.residual_graph 
 
         elif self.search_method== "BS":
             """

@@ -29,6 +29,7 @@ def sample_gaussian(g_node, num_points, ci, min_spacing, candidates=None):
         num_candidates = 1000
         mean, cov = g_node.get_gaussian()
         candidates = np.random.multivariate_normal(mean, cov, num_candidates)
+
     for candidate in candidates:
         if len(points) == num_points:
             break
@@ -127,14 +128,15 @@ class GaussianTrajectorySolver:
 
         # Initialize agent locations
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-
             # sample start locations
             gaussian_samples = self.get_node_samples(start_idx, int(self.num_agent*self.gaussian_prm.starts_weight[i]))
 
             for sample in gaussian_samples:
                 self.agent_locations[curr_agent_idx] = sample
                 self.node_agents[start_idx].append(curr_agent_idx)
+                solution[curr_agent_idx].append(sample)
                 curr_agent_idx += 1
+
         
         for t in range(self.timestep):
       

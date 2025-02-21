@@ -33,9 +33,8 @@ class CVT:
         """
 
         bounding_polygon = self.roadmap.get_bounding_polygon()
-        obstacles = [obs.geom for obs in self.roadmap.get_obstacles()]
-
         new_points = []
+
         for point, region_index in zip(points, vor.point_region):
             region = vor.regions[region_index]
             if not region or -1 in region:
@@ -47,7 +46,7 @@ class CVT:
             cell_polygon = Polygon(region_vertices)
 
             # If the region intersects with any obstacle, keep the original point
-            if any(cell_polygon.intersects(obs) for obs in obstacles):
+            if self.roadmap.is_sampling_geometry_collision(cell_polygon):
                 new_points.append(point)
             else:
                 # Calculate the centroid of the cell
@@ -57,8 +56,7 @@ class CVT:
                     if bounding_polygon.contains(centroid):
                         new_points.append(centroid.coords[0])
                     else:
-                        # If centroid is outside, keep the original point
-                        # Alternatively, you could project it back onto the bounding polygon boundary
+                        # If centroid is outside, project it to the boundary point 
                         closest_point = bounding_polygon.exterior.interpolate(bounding_polygon.exterior.project(centroid))
                         new_points.append(closest_point.coords[0])
                 else:
@@ -76,12 +74,11 @@ class CVT:
 
         width = self.roadmap.width
         height = self.roadmap.height
-        obstacles = [obs.geom for obs in self.roadmap.get_obstacles()]
 
         points = []
         while len(points) < self.num_samples:
             point = (np.random.rand()*width, np.random.rand()*height)
-            if self.roadmap.is_point_collision(point):
+            while self.roadmap.is_sampling_point_collision(point):
                 point = (np.random.rand()*width, np.random.rand()*height)
             points.append(point)
         points = np.array(points)
@@ -99,11 +96,10 @@ class CVT:
             
             region = [voronoi.vertices[i] for i in region_idx]
             cell_polygon = Polygon(region)
-            if any(cell_polygon.intersects(obs) for obs in obstacles):
+            if self.roadmap.is_sampling_geometry_collision(cell_polygon):
                 continue
 
             if cell_polygon.is_valid and not cell_polygon.is_empty:
-                x, y = cell_polygon.exterior.xy
                 B, d = johns_ellipsoid_edge_constraints(cell_polygon)
 
                 # convert ellipsoid into Gaussian Node

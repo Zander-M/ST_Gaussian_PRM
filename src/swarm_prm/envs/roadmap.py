@@ -13,13 +13,14 @@ import yaml
 
 from swarm_prm.solvers.utils.gaussian_utils import GaussianNode
 
-##### Map       #####
+##### Roadmap       #####
 
 class Roadmap:
     def __init__(self, width, height, map_name=None) -> None:
         self.width = width
         self.height = height
         self.obstacles:list[Obstacle] = []
+        self.sampling_obstacles:list[Obstacle] = []
         self.map_name = map_name
 
     def get_map_size(self):
@@ -33,6 +34,12 @@ class Roadmap:
             Add obstacles to the environment
         """
         self.obstacles.append(obstacle)
+    
+    def add_sampling_obstacle(self, obstacle):
+        """
+            Add obstacles that only affects sampling 
+        """
+        self.sampling_obstacles.append(obstacle)
     
     def get_clear_radius(self, point):
         """
@@ -85,6 +92,8 @@ class Roadmap:
         """
         points = self.get_bounding_points(segment_length)
         for obs in self.obstacles:
+            points = np.concat([points, obs.get_edge_segments(segment_length)])
+        for obs in self.sampling_obstacles:
             points = np.concat([points, obs.get_edge_segments(segment_length)])
         return points
     
@@ -216,6 +225,24 @@ class Roadmap:
             if obs.is_geometry_colliding(geom):
                 return True
         return False
+    
+    def is_sampling_geometry_collision(self, geom):
+        """
+            Check if geometry collides with obstacles and the sampling obstacles 
+        """
+        for obs in self.sampling_obstacles:
+            if obs.is_geometry_colliding(geom):
+                return True
+        if self.is_geometry_collision(geom):
+            return True
+        return False
+    
+    def is_sampling_point_collision(self, point):
+        """
+            Check if point collides with obstacles and the sampling obstacles
+        """
+        point = Point(point)
+        return self.is_sampling_geometry_collision(point)
 
     def visualize(self, fig=None, ax=None):
         """
@@ -359,12 +386,10 @@ class Obstacle:
         cvar = -mean + ita.pdf(ita.ppf(1-alpha))/alpha * std_variance # type: ignore
         # print(cvar)
         return cvar > threshold
-
-
     
     def is_geometry_colliding(self, geom):
         """
-            check if provided geometry 
+            check if provided geometry intersects with current geometry
         """
         return self.geom.intersects(geom)
 

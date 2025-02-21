@@ -7,33 +7,40 @@ import os
 from typing import List
 import yaml
 
-from swarm_prm.envs.roadmap import Roadmap, MapLoader
+from swarm_prm.envs.roadmap import Roadmap, MapLoader, Obstacle
 from swarm_prm.solvers.utils.gaussian_utils import GaussianGraphNode
 
 ##### Instance #####
 
 class Instance:
-    def __init__(self, map:Roadmap, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode],
-                 starts_weight, goals_weight, num_agent) -> None:
-        self.map = map
-        self.starts = starts
-        self.goals = goals
+    def __init__(self, roadmap:Roadmap, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode],
+                 starts_weight, goals_weight) -> None:
+        self.roadmap = roadmap
+        self.starts = []
+        self.goals = []
+
+        for start in starts:
+            self.add_start(start)
+        for goal in goals:
+            self.add_goal(goal)
+
         self.starts_weight = starts_weight
         self.goals_weight = goals_weight
-        self.num_agent = num_agent
 
     def add_start(self, start):
         self.starts.append(start)
+        self.roadmap.add_sampling_obstacle(Obstacle(start.mean, "CIRCLE", start.radius))
 
     def add_goal(self, goal):
         self.goals.append(goal)
+        self.roadmap.add_sampling_obstacle(Obstacle(goal.mean, "CIRCLE", goal.radius))
 
     def visualize(self):
         """
             Visualize instance
         """
         fig, ax = plt.subplots()
-        self.map.visualize(ax=ax)
+        self.roadmap.visualize(ax=ax)
 
         for start in self.starts:
             start.visualize(ax, edgecolor="green")
@@ -184,9 +191,7 @@ class InstanceLoader:
         starts_weight = np.array(instance_dict["starts_weights"])
         goals_weight = np.array(instance_dict["goals_weights"])
 
-        num_agent = instance_dict["num_agents"]
-        
-        self.instance = Instance(roadmap, starts, goals, starts_weight, goals_weight, num_agent)
+        self.instance = Instance(roadmap, starts, goals, starts_weight, goals_weight)
  
     def get_instance(self):
         return self.instance

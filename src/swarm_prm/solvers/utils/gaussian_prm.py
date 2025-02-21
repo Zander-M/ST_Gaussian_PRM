@@ -31,7 +31,7 @@ class GaussianPRM:
 
         # PARAMETERS
         self.instance = instance
-        self.map = self.instance.map
+        self.map = self.instance.roadmap
         self.starts = self.instance.starts
         self.goals = self.instance.goals
         self.starts_weight = self.instance.starts_weight
@@ -62,6 +62,26 @@ class GaussianPRM:
         self.shortest_paths = []
         self.starts_idx = []
         self.goals_idx = []
+
+    def add_sample(self, sample):
+        """
+            Explicitly add samples to road map. For Debugging only
+        """
+        self.samples.append(sample)
+    
+    def add_gaussian_node(self, mean, cov):
+        """
+            Explicitly add Gaussian Graph nodes to road map. For Debugging only
+        """
+        self.add_sample(mean)
+        g_node = GaussianGraphNode(mean, cov)
+        self.gaussian_nodes.append(g_node)
+
+    def add_edge(self, idx1, idx2):
+        """
+            Explicitly add edge between indicies. For Debugging only
+        """
+        self.roadmap.append((idx1, idx2))
 
     def load_instance(self):
         """
@@ -269,7 +289,11 @@ class GaussianPRM:
                 for i in range(-1, 2):
                     if (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
-                        and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
+                        and (np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
+                            or simplex[i] in self.starts_idx\
+                            or simplex[i] in self.goals_idx\
+                            or simplex[i+1] in self.starts_idx\
+                            or simplex[i+1] in self.goals_idx) \
                         and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
                                                            self.gaussian_nodes[simplex[i+1]].mean) \
                         and not self.map.is_gaussian_trajectory_collision(
@@ -277,8 +301,6 @@ class GaussianPRM:
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method):
                         self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
-
-
 
     def get_bounding_polygon(self):
         """

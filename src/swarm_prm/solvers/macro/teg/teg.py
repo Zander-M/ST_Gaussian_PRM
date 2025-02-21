@@ -7,6 +7,14 @@ from collections import defaultdict, deque
 from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 from swarm_prm.solvers.macro.teg.max_flow import MaxFlowSolver
 
+# distinguish nodes
+
+IN_NODE = 0
+OUT_NODE = 1 
+
+def dd():
+    return defaultdict()
+
 class TEGGraph:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, target_flow, max_timestep=100) -> None:
         self.gaussian_prm = gaussian_prm
@@ -15,6 +23,16 @@ class TEGGraph:
         self.max_timestep = max_timestep
         self.roadmap_graph = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
+        self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
+
+        # Verify if instance is feasible
+        for i, start in enumerate(self.gaussian_prm.starts_idx):
+            assert self.node_capacity[start] >= int(self.target_flow*self.gaussian_prm.starts_weight[i]),\
+                "Start capacity smaller than required."
+
+        for i, goal in enumerate(self.gaussian_prm.goals_idx):
+            assert self.node_capacity[goal] >= int(self.target_flow*self.gaussian_prm.goals_weight[i]), \
+                "Goal capacity smaller than required."
 
     def get_min_timestep(self):
         """
@@ -28,106 +46,109 @@ class TEGGraph:
             if curr_node in goals:
                 return time
             visited.add(curr_node)
-            for neighbor, _ in self.roadmap_graph[curr_node]:
+            for neighbor in self.roadmap_graph[curr_node]:
                 if neighbor not in visited:
                     open_list.append((neighbor, time+1))
         return 0
 
-    def build_roadmap_graph(self, method="MIN_CAPACITY"):
+    def build_roadmap_graph(self):
         """
             Find the earliest timestep that reaches the max flow
         """
         graph = defaultdict(list)
 
-        if method == "MIN_CAPACITY":
-            for edge in self.gaussian_prm.roadmap:
-                u, v = edge
-                capacity = min(self.gaussian_prm.gaussian_nodes[u].get_capacity(self.agent_radius),
-                               self.gaussian_prm.gaussian_nodes[v].get_capacity(self.agent_radius))
-                graph[u].append((v, capacity))
-                graph[v].append((u, capacity))
-            
-            for i in range(len(self.gaussian_prm.gaussian_nodes)):
-                graph[i].append((i, self.gaussian_prm.gaussian_nodes[i].get_capacity(self.agent_radius)))
+        for edge in self.gaussian_prm.roadmap:
+            u, v = edge
+            graph[u].append(v)
+            graph[v].append(u)
 
+        # adding wait edges
+        for i in range(len(self.gaussian_prm.samples)):
+            graph[i].append(i)
 
-        elif method == "VERTEX_CAPACITY":
-            assert False, "Unimplemented roadmap graph construction method."
         return graph
 
     def build_teg(self, timestep):
         """
             Build TEG based on timestep
         """
-        teg = defaultdict(lambda:dict())
-        super_source = "SS"
-        super_sink = "SG"
+        teg = defaultdict(dict)
+        super_source = ("SS", None, OUT_NODE)
+        super_sink = ("SG", None, IN_NODE)
 
-        node_idx = [i for i in range(len(self.gaussian_prm.samples))]
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source][(start_idx, 0)] = int(self.gaussian_prm.starts_weight[i]*self.target_flow)
+            teg[super_source][(start_idx, 0, IN_NODE)] = \
+                int(self.target_flow*self.gaussian_prm.starts_weight[i])
+            teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
+                int(self.target_flow*self.gaussian_prm.goals_weight[i])
 
+        # adding graph edges
         for t in range(timestep):
-            # adding wait edges
-            # for u in node_idx:
-                # teg[(u, t)][(u, t+1)] = float("inf")
-
-            # adding graph edges
             for u in self.roadmap_graph:
-                for v, capacity in self.roadmap_graph[u]:
-                    teg[(u, t)][(v, t+1)] = capacity
+                for v in self.roadmap_graph[u]:
+                    teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
+                    teg[(v, t+1, IN_NODE)][(v, t+1, OUT_NODE)] = self.node_capacity[v]
 
         return super_source, super_sink, teg 
-
-    def update_teg_flow_dict(self, teg, flow_dict, timestep):
+    
+    def build_residual_graph(self, teg):
         """
-            Update Time Expanded Graph from previous timestep 
+            Build Residual Graph
+        """
+        residual_graph = defaultdict(lambda:dict())
+        for u in teg:
+            for v in teg[u]:
+                residual_graph[u][v] = teg[u][v]
+                residual_graph[v][u] = 0
+        return residual_graph
+
+    def update_teg_residual_dict(self, teg, residual_dict, timestep, super_sink):
+        """
+            Update TEG and Residual Dict for one timestep from previous timestep 
         """
         ### TEG
-        super_sink = "SG"
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            del teg[(goal_idx, timestep-1)][super_sink] 
-            teg[(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow)
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
+                int(self.target_flow*self.gaussian_prm.goals_weight[i])
+            del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
         # update edges
         for u in self.roadmap_graph:
-            # adding wait edges
-            teg[(u, timestep-1)][(u, timestep)] = float("inf")
-            
-            # adding graph edges
-            for v, capacity in self.roadmap_graph[u]:
-                teg[(u, timestep-1)][(v, timestep)] = capacity
+            for v in self.roadmap_graph[u]:
+                teg[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
+                teg[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = \
+                    self.node_capacity[v]
     
-        ### Flow Dict
-
+        ### Residual Dict
         # update edges
         for u in self.roadmap_graph:
-            # adding wait edges
-            flow_dict[(u, timestep-1)][(u, timestep)] = float("inf")
-            flow_dict[(u, timestep)][(u, timestep-1)] = 0
+            for v in self.roadmap_graph[u]:
+                residual_dict[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
+                residual_dict[(v, timestep, IN_NODE)][(u, timestep-1, OUT_NODE)] = 0 
+                residual_dict[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = self.node_capacity[v]
+                residual_dict[(v, timestep, OUT_NODE)][(v, timestep, IN_NODE)] = 0
 
-            # adding graph edges
-            for v, capacity in self.roadmap_graph[u]:
-                flow_dict[(u, timestep-1)][(v, timestep)] = capacity
-                flow_dict[(v, timestep)][(u, timestep-1)] = 0
-
-        # update goals
+        # update goals. Preserve flow from previous residual flow
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
+            flow = residual_dict[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
-            flow = flow_dict[super_sink][(goal_idx, timestep-1)]
-            flow_dict[(goal_idx, timestep-1)][(goal_idx, timestep)] = float("inf")
-            flow_dict[(goal_idx, timestep)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow) - flow
-            flow_dict[(goal_idx, timestep)][(goal_idx, timestep-1)] = flow 
-            flow_dict[super_sink][(goal_idx, timestep)] = flow
+            residual_dict[(goal_idx, timestep-1, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = float("inf")
+            residual_dict[(goal_idx, timestep, IN_NODE)][(goal_idx, timestep-1, OUT_NODE)] = flow 
 
-            del flow_dict[(goal_idx, timestep-1)][super_sink]
-            del flow_dict[super_sink][(goal_idx, timestep-1)]
+            residual_dict[(goal_idx, timestep, IN_NODE)][(goal_idx, timestep, OUT_NODE)] = self.node_capacity[goal_idx] - flow
+            residual_dict[(goal_idx, timestep, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = flow
+
+            residual_dict[(goal_idx, timestep, OUT_NODE)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.target_flow) - flow
+            residual_dict[super_sink][(goal_idx, timestep, OUT_NODE)] = flow
+
+            del residual_dict[(goal_idx, timestep-1, OUT_NODE)][super_sink]
+            del residual_dict[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
     def get_earliest_timestep(self):
         """
@@ -136,38 +157,37 @@ class TEGGraph:
         # start from minimum path lengh between start and goal
         timestep = self.get_min_timestep()
         max_flow = 0
-        residual_graph = None
 
         super_source, super_sink, teg = self.build_teg(timestep)
+        residual_graph = self.build_residual_graph(teg)
 
+        paths = []
         while timestep < self.max_timestep:
             max_flow, residual_graph = MaxFlowSolver(teg, super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
-            print("timestep:", timestep, "max_flow:", max_flow)
-
+            # print("timestep:", timestep, "max_flow:", max_flow)
+            print("Time step: ", timestep, "Max Flow: ", max_flow)
             # by construction the max flow will not exceed the target flow
             if max_flow == self.target_flow:
                 flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                return max_flow, flow_dict, timestep, teg 
-            else:
-                timestep += 1
-            self.update_teg_flow_dict(teg, residual_graph, timestep)
+                return max_flow, flow_dict, timestep, teg, paths, residual_graph
+            timestep += 1
+            self.update_teg_residual_dict(teg, residual_graph, timestep, super_sink)
 
-        return None, None, None, None 
+        return None, None, None, None, None, None
     
     def _residual_to_flow(self, teg, residual):
         """
             Construct forward flow graph from residual graph
         """
-        flow_dict = defaultdict(lambda: dict())
+        flow_dict = defaultdict(dict)
+        
         for u in teg:
-            for v in teg[u]:
-                if teg[u][v] == float("inf"):
+            # we only look at out-node - in-node edges
+            if u[-1] == OUT_NODE:
+                for v in teg[u]:
                     flow = residual[v][u]
                     if flow > 0:
-                        flow_dict[u][v] = flow 
-                else:
-                    flow = teg[u][v] - residual[u][v]
-                    if flow > 0:
-                        flow_dict[u][v] = flow
+                            flow_dict[(u[0], u[1])][(v[0], v[1])] = flow
+            
         return flow_dict
