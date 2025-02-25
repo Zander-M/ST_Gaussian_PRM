@@ -352,20 +352,20 @@ class GaussianPRM:
             TODO: Fix bug here
         """
         paths = []
-
+        copy_dict = copy.deepcopy(flow_dict)
         for i in range(num_agent):
             paths.append([])
             u = ("SS", None) 
             while u != ("SG", None):
-                for v in flow_dict[u]:
-                    if flow_dict[u][v] > 0:
+                for v in copy_dict[u]:
+                    if copy_dict[u][v] > 0:
                         if v == ("SG", None):
                             u = v
                             break
                         else:
                             idx = v[0]
                             paths[-1].append(idx)
-                            flow_dict[u][v] -= 1
+                            copy_dict[u][v] -= 1
                             u = v
                             break
 
