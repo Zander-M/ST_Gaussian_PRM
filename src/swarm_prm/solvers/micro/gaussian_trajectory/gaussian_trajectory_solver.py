@@ -26,7 +26,7 @@ def sample_gaussian(g_node, num_points, ci, min_spacing, candidates=None):
     tree = KDTree([g_node.get_mean()])
     chi2_thresh = chi2.ppf(ci, 2)
     if candidates is None:
-        num_candidates = 1000
+        num_candidates = 10000
         mean, cov = g_node.get_gaussian()
         candidates = np.random.multivariate_normal(mean, cov, num_candidates)
 

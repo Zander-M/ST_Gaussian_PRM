@@ -2,6 +2,7 @@
     Gaussian PRM based on map info.
 """
 from collections import defaultdict 
+import copy 
 
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -299,7 +300,7 @@ class GaussianPRM:
                         and not self.map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[simplex[i]],
                              self.gaussian_nodes[simplex[i+1]],
-                             collision_check_method=collision_check_method):
+                             collision_check_method=collision_check_method, num_samples=20):
                         self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
 
     def get_bounding_polygon(self):
@@ -312,13 +313,13 @@ class GaussianPRM:
         macro_solution = {}
 
         for in_node in flow_dict:
-            if in_node in [("SS", None), ("SG", None)]:
+            if in_node == ("SS", None):
                 continue
 
             u, t = in_node
             for out_node, flow_value in flow_dict[in_node].items():
                 if flow_value > 0:
-                    if out_node == "SG":
+                    if out_node == ('SG', None):
                         continue
                     v, _ = out_node
 
@@ -350,6 +351,7 @@ class GaussianPRM:
             Return macro solution path per agent in DFS style
         """
         paths = []
+        
         for i in range(num_agent):
             paths.append([])
             u = ("SS", None) 
@@ -521,5 +523,4 @@ class GaussianPRM:
         ax.set_ylim(bottom=0, top=self.map.height)
         plt.savefig("{}.png".format(fname), dpi=400)
         plt.show()
-
-
+        return fig, ax
