@@ -1,7 +1,7 @@
 """
     DRRT for continuous space motion planning
     https://arxiv.org/pdf/1903.00994
-    This version does not have rewiring behavior
+    This version does not have rewiring behavior and does not use a heuristic
 """
 from collections import defaultdict
 
@@ -16,7 +16,7 @@ np.random.seed(0)
 from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 
 class DRRT:
-    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, 
+    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, num_agents,
                  goal_state_prob=0.1, max_time=6000):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
@@ -25,7 +25,7 @@ class DRRT:
             State is represented as a list of agent node indices.
         """
         self.gaussian_prm = gaussian_prm
-        self.nodes = self.gaussian_prm.samples
+        self.nodes = np.array(self.gaussian_prm.samples)
         self.num_agents = num_agents
         self.kd_tree = KDTree(self.nodes)
         self.roadmap = self.gaussian_prm.map
@@ -126,19 +126,18 @@ class DRRT:
         next_state = []
         for agent in range(self.num_agents):
             current_pos = self.gaussian_prm.samples[v_near[agent]]
-            random_dir_vec = (q_rand[agent] - current_pos)  
-            random_dir_vec_norm = np.linalg.norm(random_dir_vec)
-            if random_dir_vec_norm == 0:
-                random_dir_vec = np.zeros_like(random_dir_vec)
-            else:
-                random_dir_vec = random_dir_vec/np.linalg.norm(random_dir_vec)
+            diff = q_rand[agent] - current_pos  
+            norm_diff = np.linalg.norm(diff)
+            random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
+    
             neighbors = self.roadmap_neighbors[v_near[agent]]
             cos_sim = []
-            for neighbor in neighbors[1:]:
-                dir_vec = self.nodes[neighbor] - current_pos
-                dir_vec = dir_vec / np.linalg.norm(dir_vec)
-                cos_sim.append(dir_vec @ random_dir_vec)
-            next_idx = neighbors[np.argmax(cos_sim)]
+            neighbor_ids = neighbors[1:]
+            neighbor_vecs = self.nodes[neighbor_ids] - current_pos
+            norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
+            neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
+            cos_sim = neighbor_unit_vecs @ random_dir_vec
+            next_idx = neighbor_ids[np.argmax(cos_sim)]
             next_state.append(next_idx)
         return tuple(next_state)
     

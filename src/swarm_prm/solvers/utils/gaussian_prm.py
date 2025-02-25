@@ -130,7 +130,7 @@ class GaussianPRM:
                 Perform Centroidal Voronoi Tesellation for choosing 
                 Gaussian Points
             """
-            cvt_instance = CVT(self.map, self.num_samples)
+            cvt_instance = CVT(self.map, self.num_samples, iteration=500)
             self.samples, self.gaussian_nodes = cvt_instance.get_CVT()
 
         elif sampling_strategy == "UNIFORM_WITH_RADIUS":
@@ -466,12 +466,14 @@ class GaussianPRM:
         for start in self.instance.starts:
             pos = start.get_mean()
             ax.plot(pos[0], pos[1], 'bo', markersize=3)
-            start.visualize(ax=ax, edgecolor="blue")
+            start.visualize_gaussian(ax=ax, cmap="Reds")
+            # start.visualize(ax=ax, edgecolor="blue")
 
         for goal in self.instance.goals:
             pos = goal.get_mean()
             ax.plot(pos[0], pos[1], 'go', markersize=3)
-            goal.visualize(ax=ax, edgecolor="green")
+            goal.visualize_gaussian(ax=ax, cmap="Blues")
+            # goal.visualize(ax=ax, edgecolor="green")
 
         for obs in self.map.obstacles:
             if obs.obs_type == "CIRCLE": 
@@ -498,6 +500,12 @@ class GaussianPRM:
         cmap = plt.get_cmap('tab10')
         for i, gaussian_node in enumerate(self.gaussian_nodes):
             gaussian_node.visualize(ax, edgecolor=cmap(i%10))
+        
+        for start in self.starts:
+            start.visualize_gaussian(ax=ax, cmap="Reds")
+
+        for goal in self.goals:
+            goal.visualize_gaussian(ax=ax, cmap="Blues")
 
         for obs in self.map.obstacles:
             if obs.obs_type == "CIRCLE": 

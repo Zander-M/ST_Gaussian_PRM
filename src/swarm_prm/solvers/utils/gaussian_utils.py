@@ -7,7 +7,7 @@ from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.spatial import KDTree
 from scipy.linalg import sqrtm
-from scipy.stats import chi2
+from scipy.stats import chi2, multivariate_normal
 
 def is_within_ci(point, g_node, chi2_thresh):
     delta = point - g_node.get_mean()
@@ -102,6 +102,27 @@ class GaussianNode:
         ellipse = Ellipse(xy=self.mean, width=width, height=height, angle=angle, 
                           edgecolor=edgecolor, fc='None', lw=2) 
         ax.add_patch(ellipse)
+    
+    def visualize_gaussian(self, ax, threshold=.95, cmap="Blues"):
+        """
+            Visualize Gaussian using gradient coloring
+        """
+        mean, cov = self.get_gaussian()
+        x_l = mean[0] - 10
+        x_h = mean[0] + 10
+        y_l = mean[1] - 10
+        y_h = mean[1] + 10
+        x = np.linspace(x_l, x_h, 500)
+        y = np.linspace(y_l, y_h, 500)
+        X, Y = np.meshgrid(x, y)
+        pos = np.dstack((X, Y))
+
+        rv = multivariate_normal(mean, cov) 
+        Z = rv.pdf(pos)
+        chi2_val = chi2.ppf(threshold, 2)
+        threshold = rv.pdf(mean) * np.exp(-0.5*chi2_val)
+        Z_masked = np.ma.masked_where(Z < threshold, Z)
+        ax.imshow(Z_masked, extent=[x_l, x_h, y_l, y_h], origin="lower", cmap=cmap, alpha=0.8)
 
 class GaussianGraphNode(GaussianNode):
 
