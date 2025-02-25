@@ -106,7 +106,7 @@ class GaussianPRM:
         self.load_instance() # adding problem instance nodes to roadmap
         self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
 
-    def sample_free_space(self, sampling_strategy="UNIFORM", collision_check_method="CVAR"):
+    def sample_free_space(self, sampling_strategy="CVT", collision_check_method="CVAR"):
         """
             Sample points on the map uniformly random
             TODO: add Gaussian Sampling perhaps?
@@ -264,7 +264,7 @@ class GaussianPRM:
             assert False, "Unimplemented sampling strategy"
         self.new_node_idx = len(self.samples)
 
-    def build_roadmap(self, radius=10, roadmap_method="KDTREE", collision_check_method="CVAR"):
+    def build_roadmap(self, radius=15, roadmap_method="KDTREE", collision_check_method="CVAR"):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
@@ -290,11 +290,7 @@ class GaussianPRM:
                 for i in range(-1, 2):
                     if (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
-                        and (np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
-                            or simplex[i] in self.starts_idx\
-                            or simplex[i] in self.goals_idx\
-                            or simplex[i+1] in self.starts_idx\
-                            or simplex[i+1] in self.goals_idx) \
+                        and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
                         and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
                                                            self.gaussian_nodes[simplex[i+1]].mean) \
                         and not self.map.is_gaussian_trajectory_collision(
