@@ -131,3 +131,6 @@ dmypy.json
 # test files
 test_*
 /utils/*
+
+# results
+/notebooks/*.gif
