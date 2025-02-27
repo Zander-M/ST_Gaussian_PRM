@@ -46,8 +46,6 @@ def gaussian_wasserstein_distance(mean1, cov1, mean2, cov2):
 
     sqrt_cov_prod= sqrtm(cov_prod)
 
-    sqrt_cov_prod = np.real(sqrt_cov_prod)
-
     trace_term = np.trace(cov1 + cov2 - 2 * sqrt_cov_prod)
 
     W2_distance = np.sqrt(mean_diff**2 + trace_term)

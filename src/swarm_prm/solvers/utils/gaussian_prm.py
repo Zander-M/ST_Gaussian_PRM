@@ -59,6 +59,7 @@ class GaussianPRM:
         self.samples = []
         self.gaussian_nodes = []
         self.roadmap = []
+        self.roadmap_cost = []
 
         self.shortest_paths = []
         self.starts_idx = []
@@ -264,7 +265,7 @@ class GaussianPRM:
             assert False, "Unimplemented sampling strategy"
         self.new_node_idx = len(self.samples)
 
-    def build_roadmap(self, radius=15, roadmap_method="KDTREE", collision_check_method="CVAR"):
+    def build_roadmap(self, radius=30, roadmap_method="KDTREE", collision_check_method="CVAR"):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
@@ -298,6 +299,12 @@ class GaussianPRM:
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method, num_samples=20):
                         self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
+                        # Add path cost
+                        g_node1 = self.gaussian_nodes[int(simplex[i])]
+                        g_node2 = self.gaussian_nodes[int(simplex[i+1])]
+                        self.roadmap_cost.append(gaussian_wasserstein_distance(
+                            g_node1.mean, g_node1.covariance,
+                            g_node2.mean, g_node2.covariance))
 
     def get_bounding_polygon(self):
         """

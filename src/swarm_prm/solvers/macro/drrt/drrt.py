@@ -11,8 +11,6 @@ from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 import time
 
-np.random.seed(0)
-
 from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
 
 class DRRT:

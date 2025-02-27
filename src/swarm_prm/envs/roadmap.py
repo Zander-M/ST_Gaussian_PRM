@@ -165,7 +165,7 @@ class Roadmap:
     def is_gaussian_trajectory_collision(self, start:GaussianNode, goal:GaussianNode,
                                         num_samples=10, 
                                         mc_threshold=0.9, 
-                                        collision_check_method="MONTE_CARLO") -> bool:
+                                        collision_check_method="CVAR") -> bool:
         """
             Linearly interpolate between two Gaussian distributions and check if the trajectory
             collides with the environment. Return True if it collides with the environment
@@ -186,7 +186,7 @@ class Roadmap:
     def is_gaussian_collision(self, g_node:GaussianNode, 
                               collision_check_method="MONTE_CARLO", 
                               mc_num_samples=100, mc_threshold=0.9,
-                              alpha=0.9, cvar_threshold=-0.02) -> bool:
+                              alpha=0.9, cvar_threshold=-2) -> bool:
         """
             Perform collision checks of the distribution will collide
             with the environment.  
