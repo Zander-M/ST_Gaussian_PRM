@@ -8,7 +8,7 @@ from typing import List
 import yaml
 
 from swarm_prm.envs.roadmap import Roadmap, MapLoader, Obstacle
-from swarm_prm.solvers.utils.gaussian_utils import GaussianGraphNode
+from swarm_prm.utils.gaussian_utils import GaussianGraphNode
 
 ##### Instance #####
 

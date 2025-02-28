@@ -10,7 +10,7 @@ from shapely.affinity import affine_transform
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
 
-from swarm_prm.solvers.utils.gaussian_utils import GaussianGraphNode
+from swarm_prm.utils.gaussian_utils import GaussianGraphNode
 
 class CVT:
     """
@@ -83,7 +83,9 @@ class CVT:
             points.append(point)
         points = np.array(points)
 
-        boundary_points = self.roadmap.get_boundary_points(self.segment_length)
+        obstacles = self.roadmap.obstacles + self.roadmap.sampling_obstacles
+
+        boundary_points = self.roadmap.get_boundary_points(obstacles, self.segment_length)
         points = np.concat([points, boundary_points])
         for _ in range(self.iteration):
             voronoi = Voronoi(points)

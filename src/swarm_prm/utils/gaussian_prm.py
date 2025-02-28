@@ -12,16 +12,15 @@ from scipy.spatial import KDTree, Delaunay, Voronoi
 from scipy.stats.qmc import Halton
 from shapely.geometry import Point, Polygon
 
-from swarm_prm.solvers.utils.gaussian_utils import *
-from swarm_prm.envs.instance import Instance
-from swarm_prm.solvers.utils.CVT import CVT
+from swarm_prm.utils.gaussian_utils import *
+from swarm_prm.utils.cvt import CVT
 
 class GaussianPRM:
     """
         Gaussian PRM
     """
 
-    def __init__(self, instance:Instance, num_samples, 
+    def __init__(self, instance, num_samples, 
                  alpha=0.95, cvar_threshold=-8,
                  mc_threshold=0.02,
                  safety_radius=2.0,
@@ -265,7 +264,7 @@ class GaussianPRM:
             assert False, "Unimplemented sampling strategy"
         self.new_node_idx = len(self.samples)
 
-    def build_roadmap(self, radius=30, roadmap_method="KDTREE", collision_check_method="CVAR"):
+    def build_roadmap(self, radius=50, roadmap_method="KDTREE", collision_check_method="CVAR"):
         """
             Build Roadmap based on samples. Default connect radius is 10
         """
@@ -286,10 +285,14 @@ class GaussianPRM:
                 self.roadmap.extend(edges)
 
         elif roadmap_method == "TRIANGULATION":
-            tri = Delaunay(self.samples)
+            boundary_points = self.map.get_boundary_points(self.map.obstacles, 10)
+            points = np.concat(( self.samples, boundary_points))
+            tri = Delaunay(points)
             for i, simplex in enumerate(tri.simplices):
                 for i in range(-1, 2):
-                    if (simplex[i], simplex[i+1]) not in self.roadmap \
+                    if  not (boundary_points == points[simplex[i]]).all(1).any()  \
+                        and not (boundary_points == points[simplex[i+1]]).all(1).any()\
+                        and (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
                         and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
                         and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
@@ -306,6 +309,39 @@ class GaussianPRM:
                             g_node1.mean, g_node1.covariance,
                             g_node2.mean, g_node2.covariance))
 
+        elif roadmap_method == "TRIANGULATION_TEST":
+            boundary_points = self.map.get_boundary_points(self.map.obstacles, 10)
+            samples = np.array(self.samples)
+            points = np.concat((samples, boundary_points))
+            tri = Delaunay(points)
+            edges = []
+            full_edges = []
+
+            for simplex in tri.simplices:
+
+                for i in range(-1, 2):
+                    full_edges.append([points[simplex[i]], points[simplex[i+1]]])
+                    if not ((boundary_points == (points[simplex[i]])).all(1).any())\
+                       and not ((boundary_points == (points[simplex[i+1]])).all(1).any()):
+                        edges.append([points[simplex[i]], points[simplex[i+1]]])
+            return boundary_points, self.samples, points, edges, full_edges
+                    # if (points[simplex[i]]) not in boundary_points and (points[simplex[i+1]]) not in boundary_points \
+                    #     and (simplex[i], simplex[i+1]) not in self.roadmap \
+                    #     and (simplex[i+1], simplex[i]) not in self.roadmap \
+                    #     and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
+                    #     and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
+                    #                                        self.gaussian_nodes[simplex[i+1]].mean) \
+                    #     and not self.map.is_gaussian_trajectory_collision(
+                    #          self.gaussian_nodes[simplex[i]],
+                    #          self.gaussian_nodes[simplex[i+1]],
+                    #          collision_check_method=collision_check_method, num_samples=20):
+                    #     self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
+                    #     # Add path cost
+                    #     g_node1 = self.gaussian_nodes[int(simplex[i])]
+                    #     g_node2 = self.gaussian_nodes[int(simplex[i+1])]
+                    #     self.roadmap_cost.append(gaussian_wasserstein_distance(
+                    #         g_node1.mean, g_node1.covariance,
+                    #         g_node2.mean, g_node2.covariance))
     def get_bounding_polygon(self):
         """
             Get bounding polygons of the map

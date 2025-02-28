@@ -11,7 +11,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points
 import yaml
 
-from swarm_prm.solvers.utils.gaussian_utils import GaussianNode
+from swarm_prm.utils import GaussianNode
 
 ##### Roadmap       #####
 
@@ -86,14 +86,12 @@ class Roadmap:
         """
         return self.obstacles
     
-    def get_boundary_points(self, segment_length):
+    def get_boundary_points(self, obstacles, segment_length):
         """
             Return points on the boundary of the roadmap
         """
         points = self.get_bounding_points(segment_length)
-        for obs in self.obstacles:
-            points = np.concat([points, obs.get_edge_segments(segment_length)])
-        for obs in self.sampling_obstacles:
+        for obs in obstacles:
             points = np.concat([points, obs.get_edge_segments(segment_length)])
         return points
     
