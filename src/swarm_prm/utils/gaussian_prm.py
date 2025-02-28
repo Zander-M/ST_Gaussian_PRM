@@ -562,5 +562,4 @@ class GaussianPRM:
         ax.set_xlim(left=0, right=self.map.width)
         ax.set_ylim(bottom=0, top=self.map.height)
         plt.savefig("{}.png".format(fname), dpi=400)
-        plt.show()
         return fig, ax

@@ -86,7 +86,7 @@ class MinCostFlowSolver:
                 self.update_flow(path, flow)
 
                 total_flow += flow
-                total_cost += cost
+                total_cost += cost*flow
 
             return total_flow, self.residual_graph, total_cost
 

@@ -4,7 +4,7 @@
 """
 
 from collections import defaultdict, deque
-from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
+from swarm_prm.utils.gaussian_prm import GaussianPRM
 from swarm_prm.solvers.macro.mcf import MinCostFlowSolver 
 
 # distinguish nodes
