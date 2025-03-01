@@ -16,7 +16,7 @@ def dd():
     return defaultdict()
 
 class TEG_MCF:
-    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, num_agents, max_timestep=100) -> None:
+    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, max_timestep=100) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
         self.num_agents = num_agents
@@ -188,11 +188,13 @@ class TEG_MCF:
                                     residual_graph, cost_graph, initial_flow=max_flow, initial_cost=cost).solve()
             print("Time step: ", timestep, "Max Flow: ", max_flow, "Cost: ", cost) 
             # by construction the max flow will not exceed the target flow
-            if max_flow == self.num_agents:
-                flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                return timestep, flow_dict, residual_graph
+            # if max_flow == self.num_agents:
+                # flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
+                # return timestep, flow_dict, residual_graph
             timestep += 1
             self.update_residual_graph_cost_graph(teg, residual_graph, cost_graph, timestep, super_sink)
+        flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
+        return timestep, flow_dict, residual_graph
         return 0, None, None
     
     def _residual_to_flow(self, teg, residual):

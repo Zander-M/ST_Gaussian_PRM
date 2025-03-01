@@ -1,23 +1,20 @@
 """
     DRRT Star for continuous space motion planning
     https://arxiv.org/pdf/1903.00994
-    This version does not have rewiring behavior but has a heuristic
+    This version does not have rewiring behavior and does not use a heuristic
 """
-from collections import defaultdict, deque
+from collections import defaultdict
 
 import numpy as np
-from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 import time
 
-np.random.seed(0)
-
 from swarm_prm.utils.gaussian_prm import GaussianPRM
 
-class DRRTStar:
-    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, num_agents,
-                max_time=6000, iteration=100):
+class DRRT:
+    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
+                 goal_state_prob=0.1, max_time=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -27,24 +24,22 @@ class DRRTStar:
         self.gaussian_prm = gaussian_prm
         self.nodes = np.array(self.gaussian_prm.samples)
         self.num_agents = num_agents
-        self.kd_tree = KDTree(self.nodes)
         self.roadmap = self.gaussian_prm.map
         self.roadmap_neighbors = self.build_neighbors()
         self.max_time = max_time
+        self.iterations = iterations
         self.agent_radius = agent_radius
-        self.iteration = iteration
+        self.goal_state_prob = goal_state_prob
 
         # Initialize problem instance
         self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
         self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
-        self.start_state, self.goal_state = self.get_assignment()
 
-        # Compute Heuristic
-        self.heuritics = self.build_heuristic()
+        self.goal_state = self.get_assignment()
 
         # Finding target assignments
 
-        self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
+        self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             self.current_node_capacity[start_idx] = self.start_agent_count[i]
@@ -72,30 +67,11 @@ class DRRTStar:
             u, v = edge
             graph[u].append(v)
             graph[v].append(u)
-        return graph
-    
-    def build_heuristic(self):
-        """
-            Compute heuristics 
-        """
-        heuristics = {}
-        for goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            heuristics[goal_idx] = {goal_idx: {"parent": None, "val": 0}}
-            open_list = deque([goal_idx])
-            while len(open_list) > 0:
-                new_node = open_list.popleft()
-                for neighbor in self.roadmap_neighbors[new_node]:
-                    if neighbor not in heuristics[goal_idx]:
-                        heuristics[goal_idx][neighbor]["parent"] = new_node 
-                        heuristics[goal_idx][neighbor]["val"] = heuristics[goal_idx][new_node]["val"] + 1
-                        open_list.append(neighbor)
-        return heuristics
+        
+        for v in range(len(self.nodes)):
+            graph[v].append(v) # add wait edges
 
-    def random_sample(self):
-        """
-            Return a random composite state
-        """
-        return np.random.randint(0, len(self.nodes), size=(self.num_agents))
+        return graph
 
     def connect_to_target(self, goal_state):
         """
@@ -108,25 +84,21 @@ class DRRTStar:
             curr_state = self.tree[curr_state]
         return path[::-1]
         
-    def expand_drrt_star(self, v_last=None):
+    def expand(self):
         """
             Expand DRRT 
         """
-        if v_last is None:
-            q_rand = self.random_sample()
-            v_near = self.nearest_neighbor(q_rand)
-        else:
-            # Keep current frontier
-            q_rand = np.array([self.nodes[idx] for idx in self.goal_state])
-            v_near = v_last
+        q_rand = np.random.randint(0, len(self.nodes), size=(self.num_agents))
+        v_near = self.nearest_neighbor(q_rand)
+        v_new = self.Od(v_near, q_rand)
+        if v_new not in self.visited_states\
+            and self.verify_node(v_new)\
+            and self.verify_connect(v_near, v_new):
 
-        v_new = self.Id(v_near, q_rand)
-
-        if v_new not in self.visited_states:
             self.visited_states.add(v_new) # add vertex
             self.tree[v_new] = v_near # type:ignore # add edge
         
-    def nearest_neighbor(self, random_state):
+    def nearest_neighbor(self, q_rand):
         """
             Find Nearest Neighbor in the tree
         """
@@ -134,7 +106,8 @@ class DRRTStar:
         min_state = None 
         for state in self.visited_states:
             positions = np.array([self.nodes[node_idx] for node_idx in state])
-            dist = np.sum(np.linalg.norm(random_state-positions, axis=1))
+            random_positions = np.array([self.nodes[node_idx] for node_idx in q_rand])
+            dist = np.sum(np.linalg.norm(random_positions-positions, axis=1))
             if dist < min_dist:
                 min_dist = dist
                 min_state = state
@@ -146,40 +119,30 @@ class DRRTStar:
             TODO: update cost
         """
     
-    def Id(self, v_near, q_rand):
+    def Od(self, v_near, q_rand):
         """
             Oracle steering function
         """
         next_state = []
         for agent in range(self.num_agents):
-            if q_rand[agent] == self.goal_state[agent]:
-
-                # Follow shortest path to goal
-                neighbors = self.roadmap_neighbors[v_near[agent]]
-                h_values = [self.heuritics[self.goal_state[agent]][neighbor]["val"] for neighbor in neighbors]
-                next_state.append(neighbors[np.argmin(h_values)])
-            else:
-                # Select random next state
-                current_pos = self.gaussian_prm.samples[v_near[agent]]
-                diff = q_rand[agent] - current_pos  
-                norm_diff = np.linalg.norm(diff)
-                random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
-    
-                neighbors = self.roadmap_neighbors[v_near[agent]]
-                cos_sim = []
-                neighbor_ids = neighbors[1:]
-                neighbor_vecs = self.nodes[neighbor_ids] - current_pos
-                norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
-                neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
-                cos_sim = neighbor_unit_vecs @ random_dir_vec
-                next_idx = neighbor_ids[np.argmax(cos_sim)]
-                next_state.append(next_idx)
+            if v_near[agent] == q_rand[agent]:
+                next_state.append(v_near[agent]) # if samples the same state, just wait.
+                continue
+            current_pos = self.nodes[v_near[agent]]
+            diff = self.nodes[q_rand[agent]] - current_pos  
+            norm_diff = np.linalg.norm(diff)
+            random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
+            neighbors = self.roadmap_neighbors[v_near[agent]]
+            cos_sim = []
+            neighbor_ids = neighbors
+            neighbor_vecs = self.nodes[neighbor_ids] - current_pos
+            norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
+            neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
+            cos_sim = neighbor_unit_vecs @ random_dir_vec
+            next_idx = neighbor_ids[np.argmax(cos_sim)]
+            next_state.append(next_idx)
         return tuple(next_state)
     
-    def get_neighbor_states(self, state):
-        """
-            Get Neighbor states from the 
-        """
     def get_parent(self, nodes):
         """
             Get node parent
@@ -199,55 +162,53 @@ class DRRTStar:
         for i, g_node in enumerate(self.gaussian_prm.starts):
             starts += [g_node.get_mean()] * self.start_agent_count[i] 
 
-        starts= []
-        starts_idx = []
-        
         goals = []
         goals_idx = []
-
-        for i, g_node in enumerate(self.gaussian_prm.starts):
-            starts += [g_node.get_mean()] * self.start_agent_count[i]
-            starts_idx += [self.gaussian_prm.starts_idx[i]] * self.start_agent_count[i]
-
         for i, g_node in enumerate(self.gaussian_prm.goals):
             goals += [g_node.get_mean()] * self.goal_agent_count[i]
             goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goal_agent_count[i]
 
         distance_matrix = cdist(starts, goals)
-        row_ind, col_ind = linear_sum_assignment(distance_matrix)
-
-        start_state = tuple([starts_idx[idx] for idx in row_ind])
+        _, col_ind = linear_sum_assignment(distance_matrix)
         goal_state = tuple([goals_idx[idx] for idx in col_ind])
-        return start_state, goal_state
+        return goal_state
 
     def get_solution(self):
         """
             Get solution per agent
         """
-
-        v_last = self.start_state
         start_time = time.time()
         while time.time() - start_time < self.max_time:
-            for _ in range(self.iteration):
-                v_last = self.expand_drrt_star(v_last)
-
+            for _ in range(self.iterations):
+                self.expand()
             if self.goal_state in self.visited_states:
                 path = self.connect_to_target(self.goal_state)
                 print("Found solution")
                 return path, self.cost
-
         print("exceeded run time")
         print(self.visited_states)
         return None, None
 
-    def verify_node(self, state):
+    def verify_node(self, node):
         """
-            Verify if the new state is valid
+            Verify if new state is valid
+            Return false if node capacity exceeded
         """
-        pass
+        count = np.zeros(len(self.nodes))
+        for i in node:
+            count[i] += 1
+        return all(self.node_capacity - count) # guarantee if all node capacity > agent count
+        
 
-    def verify_connect(self, state_1, state_2):
+    def verify_connect(self, node1, node2):
         """
             Verify if two states can be connected
+            Return false if agents moving in different directions 
         """
-        pass
+        edge = set()
+        for i in range(self.num_agents):
+            if (node2[i], node1[i]) not in edge:
+                edge.add((node1[i], node2[i]))
+            else:
+                return False
+        return True
