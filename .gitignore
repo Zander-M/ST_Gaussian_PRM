@@ -134,3 +134,4 @@ test_*
 
 # results
 /notebooks/*.gif
+/notebooks/solutions/*

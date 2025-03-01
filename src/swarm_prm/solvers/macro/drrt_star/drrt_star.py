@@ -13,7 +13,7 @@ import time
 
 np.random.seed(0)
 
-from swarm_prm.solvers.utils.gaussian_prm import GaussianPRM
+from swarm_prm.utils.gaussian_prm import GaussianPRM
 
 class DRRTStar:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, num_agents,

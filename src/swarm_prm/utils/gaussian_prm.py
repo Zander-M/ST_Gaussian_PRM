@@ -529,7 +529,7 @@ class GaussianPRM:
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)
         ax.set_ylim(bottom=0, top=self.map.height)
-        plt.savefig("{}.png".format(fname))
+        # plt.savefig("{}.png".format(fname))
         return fig, ax
     
     def visualize_g_nodes(self, fname="test_g_nodes"):
@@ -561,5 +561,5 @@ class GaussianPRM:
         ax.set_aspect('equal')
         ax.set_xlim(left=0, right=self.map.width)
         ax.set_ylim(bottom=0, top=self.map.height)
-        plt.savefig("{}.png".format(fname), dpi=400)
+        # plt.savefig("{}.png".format(fname), dpi=400)
         return fig, ax

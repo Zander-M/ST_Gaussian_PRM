@@ -190,10 +190,10 @@ class TEG_MCF:
             # by construction the max flow will not exceed the target flow
             if max_flow == self.num_agents:
                 flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                return timestep, flow_dict
+                return timestep, flow_dict, residual_graph
             timestep += 1
             self.update_residual_graph_cost_graph(teg, residual_graph, cost_graph, timestep, super_sink)
-        return 0, None
+        return 0, None, None
     
     def _residual_to_flow(self, teg, residual):
         """
