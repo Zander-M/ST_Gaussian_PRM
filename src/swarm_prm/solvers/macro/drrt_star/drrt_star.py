@@ -12,7 +12,7 @@ import time
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
 
-class DRRT:
+class DRRT_Star:
     def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
                  goal_state_prob=0.1, max_time=6000, iterations=10):
         """
@@ -73,6 +73,12 @@ class DRRT:
 
         return graph
 
+    def build_heuristic(self):
+        """
+            Build Heuristic
+        """
+        pass
+
     def connect_to_target(self, goal_state):
         """
             Connect currect tree to target
@@ -84,13 +90,13 @@ class DRRT:
             curr_state = self.tree[curr_state]
         return path[::-1]
         
-    def expand(self):
+    def expand_drrt_star(self):
         """
-            Expand DRRT 
+            Expand DRRT Star
         """
         q_rand = np.random.randint(0, len(self.nodes), size=(self.num_agents))
         v_near = self.nearest_neighbor(q_rand)
-        v_new = self.Od(v_near, q_rand)
+        v_new = self.Id(v_near, q_rand)
         if v_new not in self.visited_states\
             and self.verify_node(v_new)\
             and self.verify_connect(v_near, v_new):
@@ -119,7 +125,7 @@ class DRRT:
             TODO: update cost
         """
     
-    def Od(self, v_near, q_rand):
+    def Id(self, v_near, q_rand):
         """
             Oracle steering function
         """
@@ -180,7 +186,7 @@ class DRRT:
         start_time = time.time()
         while time.time() - start_time < self.max_time:
             for _ in range(self.iterations):
-                self.expand()
+                self.expand_drrt_star()
             if self.goal_state in self.visited_states:
                 path = self.connect_to_target(self.goal_state)
                 print("Found solution")
@@ -198,7 +204,6 @@ class DRRT:
         for i in node:
             count[i] += 1
         return all(self.node_capacity - count) # guarantee if all node capacity > agent count
-        
 
     def verify_connect(self, node1, node2):
         """

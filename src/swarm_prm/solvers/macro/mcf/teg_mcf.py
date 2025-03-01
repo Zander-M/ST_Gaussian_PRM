@@ -21,7 +21,7 @@ class TEG_MCF:
         self.agent_radius = agent_radius
         self.num_agents = num_agents
         self.max_timestep = max_timestep
-        self.roadmap_graph, self.cost_dict = self.build_roadmap_graph()
+        self.roadmap, self.cost_dict = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
         self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
 
@@ -46,7 +46,7 @@ class TEG_MCF:
             if curr_node in goals:
                 return time
             visited.add(curr_node)
-            for neighbor in self.roadmap_graph[curr_node]:
+            for neighbor in self.roadmap[curr_node]:
                 if neighbor not in visited:
                     open_list.append((neighbor, time+1))
         return 0
@@ -91,8 +91,8 @@ class TEG_MCF:
 
         # adding graph edges
         for t in range(timestep):
-            for u in self.roadmap_graph:
-                for v in self.roadmap_graph[u]:
+            for u in self.roadmap:
+                for v in self.roadmap[u]:
                     teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
                     teg[(v, t+1, IN_NODE)][(v, t+1, OUT_NODE)] = self.node_capacity[v]
         return super_source, super_sink, teg 
@@ -131,15 +131,15 @@ class TEG_MCF:
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
         # update edges
-        for u in self.roadmap_graph:
-            for v in self.roadmap_graph[u]:
+        for u in self.roadmap:
+            for v in self.roadmap[u]:
                 teg[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
                 teg[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = \
                     self.node_capacity[v]
         ### Residual Dict
         # update edges
-        for u in self.roadmap_graph:
-            for v in self.roadmap_graph[u]:
+        for u in self.roadmap:
+            for v in self.roadmap[u]:
                 residual_graph[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
                 residual_graph[(v, timestep, IN_NODE)][(u, timestep-1, OUT_NODE)] = 0 
                 residual_graph[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = self.node_capacity[v]
