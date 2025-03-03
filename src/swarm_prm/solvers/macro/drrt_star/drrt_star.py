@@ -14,7 +14,7 @@ from swarm_prm.solvers.macro.drrt_star import johnsons_algorithm
 
 class DRRT_Star:
     def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
-                 goal_state_prob=0.1, max_time=6000, iterations=10):
+                 max_time=30, iterations=1):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -30,15 +30,13 @@ class DRRT_Star:
         self.max_time = max_time
         self.iterations = iterations
         self.agent_radius = agent_radius
-        self.goal_state_prob = goal_state_prob
 
         # Initialize problem instance
         self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
         self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
 
-        self.start_state, self.goal_state = self.get_assignment()
-
         # Finding target assignments
+        self.start_state, self.goal_state = self.get_assignment()
 
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
@@ -46,17 +44,16 @@ class DRRT_Star:
             self.current_node_capacity[start_idx] = self.start_agent_count[i]
         
         # initialize agent location
-        self.current_agent_node_idx = []
+        self.start_agent_node_idx = []
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.current_agent_node_idx += [start_idx] * self.start_agent_count[i]
-        self.current_agent_node_idx = tuple(self.current_agent_node_idx)
-        self.visited_states = {self.current_agent_node_idx}
+            self.start_agent_node_idx += [start_idx] * self.start_agent_count[i]
+        self.start_agent_node_idx = tuple(self.start_agent_node_idx)
+        self.visited_states = {self.start_agent_node_idx}
         
         # DRRT structure 
-
         self.cost = defaultdict(lambda:float("inf")) # cost
-        self.cost[self.current_agent_node_idx] = 0. 
-        self.tree = {self.current_agent_node_idx: None} # parent
+        self.cost[self.start_agent_node_idx] = 0. 
+        self.tree = {self.start_agent_node_idx: None} # parent
         self.best_path = None
         self.best_path_cost = float("inf")
 
@@ -83,10 +80,10 @@ class DRRT_Star:
         neighbors = []
         neighbor_candidates = []
         for v_i in v_new:
-            neighbor_candidates.append(set([v for v in self.roadmap_neighbors[v_i]]))
+            neighbor_candidates.append(set([v[0] for v in self.roadmap_neighbors[v_i]]))
         
         for state in self.visited_states:
-            if all(state in candidate for state, candidate in zip(state, neighbor_candidates)):
+            if all(v in candidate for v, candidate in zip(state, neighbor_candidates)):
                 neighbors.append(state)
             
         return neighbors
@@ -102,11 +99,10 @@ class DRRT_Star:
             # reject invalid states
             if self.verify_node(v_new) \
             and self.verify_connect(neighbor, v_new):
-                continue 
-            v_new_cost = self.cost[neighbor] + self.get_distance(neighbor, v_new)
-            if cost > v_new_cost:
-                cost = v_new_cost 
-                v_best = neighbor
+                v_new_cost = self.cost[neighbor] + self.get_distance(neighbor, v_new)
+                if cost > v_new_cost:
+                    cost = v_new_cost 
+                    v_best = neighbor
         return v_best, cost
 
     def get_heuristic(self, state):
@@ -131,6 +127,7 @@ class DRRT_Star:
     def expand_drrt_star(self, v_last):
         """
             Expand DRRT Star
+            TODO: fix cost update
         """
         if v_last is None:
             q_rand = np.random.randint(0, len(self.nodes), size=self.num_agents)
@@ -151,7 +148,8 @@ class DRRT_Star:
         if v_new not in self.visited_states:
             # v_new verified in get_neighbors
             self.visited_states.add(v_new) # add vertex
-            self.tree[v_new] = v_new # type:ignore # add edge
+            self.tree[v_new] = v_best # type:ignore # add edge
+            self.cost[v_new] = v_new_cost
         else: 
             # Rewire v_new
             self.tree[v_new] = v_best
@@ -161,6 +159,7 @@ class DRRT_Star:
         for neighbor in neighbors:
             transition_cost = self.cost[v_new] + self.get_distance(v_new, neighbor)
             if  transition_cost < self.cost[neighbor]:
+                print("rewire")
                 self.tree[neighbor] = v_new # type: ignore
                 self.cost[neighbor] = transition_cost # type: ignore
         if self.get_heuristic(v_new) < self.get_heuristic(v_best):
@@ -175,9 +174,7 @@ class DRRT_Star:
         min_dist = float("inf")
         min_state = None 
         for state in self.visited_states:
-            positions = np.array([self.nodes[node_idx] for node_idx in state])
-            random_positions = np.array([self.nodes[node_idx] for node_idx in q_rand])
-            dist = np.sum(np.linalg.norm(random_positions-positions, axis=1))
+            dist = np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(q_rand, state)])
             if dist < min_dist:
                 min_dist = dist
                 min_state = state
@@ -186,17 +183,16 @@ class DRRT_Star:
     def Id(self, v_near, q_rand):
         """
             Oracle steering function
-            TODO: update this 
         """
         next_state = []
         for agent in range(self.num_agents):
             if q_rand[agent] == self.goal_state[agent]:
-                neighbors, cost = self.roadmap_neighbors[v_near[agent]]
-                heuristics = [self.shortest_distance[(neighbor, self.goal_state[agent])] for neighbor in neighbors]
-                next_state.append(neighbors[np.argmin(heuristics)])
+                neighbors = self.roadmap_neighbors[v_near[agent]]
+                heuristics = [self.shortest_distance[(neighbor[0], self.goal_state[agent])] for neighbor in neighbors]
+                next_state.append(neighbors[np.argmin(heuristics)][0])
             else: 
-                neighbors, cost = self.roadmap_neighbors[v_near[agent]]
-                next_state.append(neighbors[np.random.randint(len(neighbors))])
+                neighbors = self.roadmap_neighbors[v_near[agent]]
+                next_state.append(neighbors[np.random.randint(len(neighbors))][0])
         return tuple(next_state)
     
     def get_distance(self, node1, node2):
@@ -238,10 +234,9 @@ class DRRT_Star:
             
             path, cost = self.connect_to_target(self.goal_state)
             if path is not None and cost < self.best_path_cost:
+                print("Cost: ", cost)
                 self.best_path = path
                 self.best_path_cost = cost
-            if (time.time() - start_time) % 60 == 0:
-                print("Current Cost: ", self.best_path_cost)
         return self.best_path, self.best_path_cost
 
     def verify_node(self, node):
