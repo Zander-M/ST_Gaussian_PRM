@@ -1,7 +1,6 @@
 """
     DRRT Star for continuous space motion planning
     https://arxiv.org/pdf/1903.00994
-    This version does not have rewiring behavior and does not use a heuristic
 """
 from collections import defaultdict
 
@@ -11,6 +10,7 @@ from scipy.optimize import linear_sum_assignment
 import time
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro.drrt_star import johnsons_algorithm
 
 class DRRT_Star:
     def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
@@ -26,6 +26,7 @@ class DRRT_Star:
         self.num_agents = num_agents
         self.roadmap = self.gaussian_prm.map
         self.roadmap_neighbors = self.build_neighbors()
+        self.shortest_distance = johnsons_algorithm(self.roadmap_neighbors)
         self.max_time = max_time
         self.iterations = iterations
         self.agent_radius = agent_radius
@@ -35,7 +36,7 @@ class DRRT_Star:
         self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
         self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
 
-        self.goal_state = self.get_assignment()
+        self.start_state, self.goal_state = self.get_assignment()
 
         # Finding target assignments
 
@@ -49,13 +50,15 @@ class DRRT_Star:
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             self.current_agent_node_idx += [start_idx] * self.start_agent_count[i]
         self.current_agent_node_idx = tuple(self.current_agent_node_idx)
-
         self.visited_states = {self.current_agent_node_idx}
         
         # DRRT structure 
 
-        self.cost = {self.current_agent_node_idx:0} # cost
+        self.cost = defaultdict(lambda:float("inf")) # cost
+        self.cost[self.current_agent_node_idx] = 0. 
         self.tree = {self.current_agent_node_idx: None} # parent
+        self.best_path = None
+        self.best_path_cost = float("inf")
 
     def build_neighbors(self):
         """
@@ -63,47 +66,108 @@ class DRRT_Star:
         """
         graph = defaultdict(list)
 
-        for edge in self.gaussian_prm.roadmap:
+        for i, edge in enumerate(self.gaussian_prm.roadmap):
             u, v = edge
-            graph[u].append(v)
-            graph[v].append(u)
+            graph[u].append((v, self.gaussian_prm.roadmap_cost[i]))
+            graph[v].append((u, self.gaussian_prm.roadmap_cost[i]))
         
         for v in range(len(self.nodes)):
-            graph[v].append(v) # add wait edges
-
+            graph[v].append((v, 0)) # add wait edges
         return graph
+    
+    def get_neighbors(self, v_new):
+        """
+            Get composite state neighbors.
+            Adj(v_new, G_hat) cap T
+        """
+        neighbors = []
+        neighbor_candidates = []
+        for v_i in v_new:
+            neighbor_candidates.append(set([v for v in self.roadmap_neighbors[v_i]]))
+        
+        for state in self.visited_states:
+            if all(state in candidate for state, candidate in zip(state, neighbor_candidates)):
+                neighbors.append(state)
+            
+        return neighbors
 
-    def build_heuristic(self):
+    def choose_best_neighbor(self, neighbors, v_new):
         """
-            Build Heuristic
+            argmin cost(V)  cost(L(V, Vnew))
         """
-        pass
+        v_best = None
+        cost = float("inf")
+        for neighbor in neighbors:
+
+            # reject invalid states
+            if self.verify_node(v_new) \
+            and self.verify_connect(neighbor, v_new):
+                continue 
+            v_new_cost = self.cost[neighbor] + self.get_distance(neighbor, v_new)
+            if cost > v_new_cost:
+                cost = v_new_cost 
+                v_best = neighbor
+        return v_best, cost
+
+    def get_heuristic(self, state):
+        """
+            Get Heuristic for macro states. We use actual path cost
+        """
+        return np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(state, self.goal_state)])
 
     def connect_to_target(self, goal_state):
         """
             Connect currect tree to target
         """
+        if goal_state not in self.visited_states:
+            return None, float("inf")
         path = []
         curr_state = goal_state
         while curr_state is not None:
             path.append(curr_state)
             curr_state = self.tree[curr_state]
-        return path[::-1]
+        return path[::-1], self.cost[goal_state]
         
-    def expand_drrt_star(self):
+    def expand_drrt_star(self, v_last):
         """
             Expand DRRT Star
         """
-        q_rand = np.random.randint(0, len(self.nodes), size=(self.num_agents))
-        v_near = self.nearest_neighbor(q_rand)
+        if v_last is None:
+            q_rand = np.random.randint(0, len(self.nodes), size=self.num_agents)
+            v_near = self.nearest_neighbor(q_rand)
+        else:
+            q_rand = self.goal_state
+            v_near = v_last
         v_new = self.Id(v_near, q_rand)
-        if v_new not in self.visited_states\
-            and self.verify_node(v_new)\
-            and self.verify_connect(v_near, v_new):
+        neighbors = self.get_neighbors(v_new)
+        v_best, v_new_cost = self.choose_best_neighbor(neighbors, v_new)
 
+        if v_best is None:
+            return None
+
+        if v_new_cost > self.best_path_cost:
+            return None
+
+        if v_new not in self.visited_states:
+            # v_new verified in get_neighbors
             self.visited_states.add(v_new) # add vertex
-            self.tree[v_new] = v_near # type:ignore # add edge
+            self.tree[v_new] = v_new # type:ignore # add edge
+        else: 
+            # Rewire v_new
+            self.tree[v_new] = v_best
+            self.cost[v_new] = v_new_cost # type: ignore
         
+        # Rewire neighbors
+        for neighbor in neighbors:
+            transition_cost = self.cost[v_new] + self.get_distance(v_new, neighbor)
+            if  transition_cost < self.cost[neighbor]:
+                self.tree[neighbor] = v_new # type: ignore
+                self.cost[neighbor] = transition_cost # type: ignore
+        if self.get_heuristic(v_new) < self.get_heuristic(v_best):
+            return v_new
+        else:
+            return None
+
     def nearest_neighbor(self, q_rand):
         """
             Find Nearest Neighbor in the tree
@@ -119,55 +183,37 @@ class DRRT_Star:
                 min_state = state
         return min_state
 
-    def get_cost(self, node):
-        """
-            Compute cost of node
-            TODO: update cost
-        """
-    
     def Id(self, v_near, q_rand):
         """
             Oracle steering function
+            TODO: update this 
         """
         next_state = []
         for agent in range(self.num_agents):
-            if v_near[agent] == q_rand[agent]:
-                next_state.append(v_near[agent]) # if samples the same state, just wait.
-                continue
-            current_pos = self.nodes[v_near[agent]]
-            diff = self.nodes[q_rand[agent]] - current_pos  
-            norm_diff = np.linalg.norm(diff)
-            random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
-            neighbors = self.roadmap_neighbors[v_near[agent]]
-            cos_sim = []
-            neighbor_ids = neighbors
-            neighbor_vecs = self.nodes[neighbor_ids] - current_pos
-            norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
-            neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
-            cos_sim = neighbor_unit_vecs @ random_dir_vec
-            next_idx = neighbor_ids[np.argmax(cos_sim)]
-            next_state.append(next_idx)
+            if q_rand[agent] == self.goal_state[agent]:
+                neighbors, cost = self.roadmap_neighbors[v_near[agent]]
+                heuristics = [self.shortest_distance[(neighbor, self.goal_state[agent])] for neighbor in neighbors]
+                next_state.append(neighbors[np.argmin(heuristics)])
+            else: 
+                neighbors, cost = self.roadmap_neighbors[v_near[agent]]
+                next_state.append(neighbors[np.random.randint(len(neighbors))])
         return tuple(next_state)
-    
-    def get_parent(self, nodes):
-        """
-            Get node parent
-        """
-        return self.tree[nodes]
     
     def get_distance(self, node1, node2):
         """
             Get node distance
         """
+        return np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(node1, node2)])
 
     def get_assignment(self):
         """
             Get goal assignment
         """
         starts = []
+        starts_idx = []
         for i, g_node in enumerate(self.gaussian_prm.starts):
             starts += [g_node.get_mean()] * self.start_agent_count[i] 
-
+            starts_idx += [self.gaussian_prm.starts_idx[i]] * self.start_agent_count[i]
         goals = []
         goals_idx = []
         for i, g_node in enumerate(self.gaussian_prm.goals):
@@ -175,25 +221,28 @@ class DRRT_Star:
             goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goal_agent_count[i]
 
         distance_matrix = cdist(starts, goals)
-        _, col_ind = linear_sum_assignment(distance_matrix)
+        row_ind, col_ind = linear_sum_assignment(distance_matrix)
+        start_state = tuple([starts_idx[idx] for idx in row_ind])
         goal_state = tuple([goals_idx[idx] for idx in col_ind])
-        return goal_state
+        return start_state, goal_state
 
     def get_solution(self):
         """
             Get solution per agent
         """
         start_time = time.time()
+        v_last = self.start_state
         while time.time() - start_time < self.max_time:
             for _ in range(self.iterations):
-                self.expand_drrt_star()
-            if self.goal_state in self.visited_states:
-                path = self.connect_to_target(self.goal_state)
-                print("Found solution")
-                return path, self.cost
-        print("exceeded run time")
-        print(self.visited_states)
-        return None, None
+                v_last = self.expand_drrt_star(v_last)
+            
+            path, cost = self.connect_to_target(self.goal_state)
+            if path is not None and cost < self.best_path_cost:
+                self.best_path = path
+                self.best_path_cost = cost
+            if (time.time() - start_time) % 60 == 0:
+                print("Current Cost: ", self.best_path_cost)
+        return self.best_path, self.best_path_cost
 
     def verify_node(self, node):
         """
