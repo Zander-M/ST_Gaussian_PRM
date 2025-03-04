@@ -39,6 +39,16 @@ class DRRT_Star:
         self.start_state, self.goal_state = self.get_assignment()
 
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
+
+        # Verify if instance is feasible
+        for i, start in enumerate(self.gaussian_prm.starts_idx):
+            assert self.node_capacity[start] >= int(self.num_agents*self.gaussian_prm.starts_weight[i]),\
+                "Start capacity smaller than required."
+
+        for i, goal in enumerate(self.gaussian_prm.goals_idx):
+            assert self.node_capacity[goal] >= int(self.num_agents*self.gaussian_prm.goals_weight[i]), \
+                "Goal capacity smaller than required."
+
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             self.current_node_capacity[start_idx] = self.start_agent_count[i]
