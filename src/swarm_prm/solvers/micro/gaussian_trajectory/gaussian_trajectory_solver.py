@@ -42,13 +42,16 @@ def sample_gaussian(g_node, num_points, ci, min_spacing, candidates=None):
 class GaussianTrajectorySolver:
 
     def __init__(self, gaussian_prm:GaussianPRM, macro_solution, timestep,
-                    num_agent, safety_gap = 0.2, ci=0.8,
+                     num_agent, starts_agent_count, goals_agent_count,
+                     safety_gap = 0.2, ci=0.8,
                     interpolation_count=10
                  ):
         self.gaussian_prm = gaussian_prm 
         self.macro_solution = macro_solution
         self.timestep = timestep
-        self.num_agent = num_agent
+        self.num_agents = num_agent
+        self.starts_agent_count = starts_agent_count
+        self.goals_agent_count = goals_agent_count
         self.interpolation_count = interpolation_count
 
         # Gaussian Sampling Parameters
@@ -63,7 +66,7 @@ class GaussianTrajectorySolver:
 
         self.agent_locations = {} # Track current agent locations
         self.node_agents = defaultdict(list) # Track agents assigned to each node
-        self.agent_assigned = [False] * self.num_agent
+        self.agent_assigned = [False] * self.num_agents
 
     def choose_unassigned_agents(self, prev_node, node, num_agents):
         """
@@ -123,13 +126,13 @@ class GaussianTrajectorySolver:
             sum of distances between start and goal points.
         """
 
-        solution = [[] for _ in range(self.num_agent)]
+        solution = [[] for _ in range(self.num_agents)]
         curr_agent_idx = 0
 
         # Initialize agent locations
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             # sample start locations
-            gaussian_samples = self.get_node_samples(start_idx, int(self.num_agent*self.gaussian_prm.starts_weight[i]))
+            gaussian_samples = self.get_node_samples(start_idx, self.starts_agent_count[i])
 
             for sample in gaussian_samples:
                 self.agent_locations[curr_agent_idx] = sample
@@ -141,7 +144,7 @@ class GaussianTrajectorySolver:
         for t in range(self.timestep):
       
             # Reset Agent assingment
-            self.agent_assigned = [False] * self.num_agent
+            self.agent_assigned = [False] * self.num_agents
 
             # Index incoming flows for each target node
             incoming_flow = defaultdict(list)

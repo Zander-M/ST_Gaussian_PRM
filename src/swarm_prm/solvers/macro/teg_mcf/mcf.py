@@ -9,8 +9,10 @@ class MinCostFlowSolver:
     """
         Min Cost Flow Solver that can reuse residual graphs.
     """
-    def __init__(self, start, goal, 
-                 residual_graph, cost_graph, initial_flow=0., initial_cost=0.,
+    def __init__(self, start, goal, residual_graph, 
+                 cost_graph, 
+                 flow_constraints,
+                 initial_flow=0., initial_cost=0.,
                  search_method="EK") -> None:
         """
             Min Cost Flow
@@ -27,6 +29,9 @@ class MinCostFlowSolver:
         self.start = start
         self.goal = goal
         self.heuristic = self.build_heuristic()
+
+        # flow_constraint
+        self.flow_constraints = flow_constraints
     
     def build_heuristic(self):
         """
@@ -67,6 +72,13 @@ class MinCostFlowSolver:
             assert flow > 0
             self.residual_graph[u][v] -= flow
             self.residual_graph[v][u] += flow
+    
+    def verify_node(self, next_node):
+        """
+            Verify if next node is valid
+            TODO: Implement this
+        """
+        return True
     
     def solve(self):
         """

@@ -25,7 +25,7 @@ class DRRT:
         self.gaussian_prm = gaussian_prm
         self.nodes = np.array(self.gaussian_prm.samples)
         self.num_agents = num_agents
-        self.roadmap = self.gaussian_prm.map
+        self.roadmap = self.gaussian_prm.raw_map
         self.roadmap_neighbors = self.build_neighbors()
         self.max_time = max_time
         self.iterations = iterations

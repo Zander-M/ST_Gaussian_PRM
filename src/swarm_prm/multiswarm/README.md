@@ -1,4 +1,4 @@
-# PBS
+# Prioritized Planning
 
-Priority-Based Search for coordinating multiple swarms
+Prioritized Planning for coordinating multiple swarms
 

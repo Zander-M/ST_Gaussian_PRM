@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.patches import Circle
 import numpy as np
-from scipy.spatial import KDTree, Delaunay, Voronoi
+from scipy.spatial import KDTree, Delaunay 
 from scipy.stats.qmc import Halton
 from shapely.geometry import Point, Polygon
 
@@ -31,13 +31,11 @@ class GaussianPRM:
 
         # PARAMETERS
         self.instance = instance
-        self.map = self.instance.roadmap
+        self.num_samples = num_samples
+        self.raw_map = self.instance.roadmap
         self.starts = self.instance.starts
         self.goals = self.instance.goals
-        self.starts_weight = self.instance.starts_weight
-        self.goals_weight = self.instance.goals_weight
 
-        self.num_samples = num_samples
         self.alpha = alpha
         self.cvar_threshold = cvar_threshold
         self.safety_radius = safety_radius
@@ -61,8 +59,15 @@ class GaussianPRM:
         self.roadmap_cost = []
 
         self.shortest_paths = []
-        self.starts_idx = []
-        self.goals_idx = []
+
+        # Add starts and goals to the map
+        self.starts_idx = [i for i in range(len(self.samples), len(self.samples) + len(self.starts))]
+        self.samples.extend([start.get_mean() for start in self.starts])
+        self.gaussian_nodes.extend(self.starts)
+
+        self.goals_idx = [i for i in range(len(self.samples), len(self.samples) + len(self.goals))]
+        self.samples.extend([goal.get_mean() for goal in self.goals])
+        self.gaussian_nodes.extend(self.goals)
 
     def add_sample(self, sample):
         """
@@ -84,26 +89,11 @@ class GaussianPRM:
         """
         self.roadmap.append((idx1, idx2))
 
-    def load_instance(self):
-        """
-            Load problem instance, adding start and target GMM nodes to the roadmap
-        """
-
-        self.starts_idx = [i for i in range(len(self.samples), len(self.samples) + len(self.starts))]
-        self.samples.extend([start.get_mean() for start in self.starts])
-        self.gaussian_nodes.extend(self.starts)
-
-        self.goals_idx = [i for i in range(len(self.samples), len(self.samples) + len(self.goals))]
-        self.samples.extend([goal.get_mean() for goal in self.goals])
-        self.gaussian_nodes.extend(self.goals)
-
     def roadmap_construction(self):
         """
             Build Gaussian PRM
         """
-
         self.sample_free_space() # sample node locations 
-        self.load_instance() # adding problem instance nodes to roadmap
         self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
 
     def sample_free_space(self, sampling_strategy="CVT", collision_check_method="CVAR"):
@@ -113,14 +103,14 @@ class GaussianPRM:
         """
 
         if sampling_strategy == "UNIFORM":
-            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
             while len(self.samples) < self.num_samples:
                 x = np.random.uniform(min_x, max_x)
                 y = np.random.uniform(min_y, max_y)
                 node = np.array((x, y))
-                if not self.map.is_point_collision(node):
+                if not self.raw_map.is_point_collision(node):
                     radius = np.inf
-                    for obs in self.map.obstacles:
+                    for obs in self.raw_map.obstacles:
                         radius = min(radius, obs.get_dist(node))
                     g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                     self.samples.append(node)
@@ -131,39 +121,41 @@ class GaussianPRM:
                 Perform Centroidal Voronoi Tesellation for choosing 
                 Gaussian Points
             """
-            cvt_instance = CVT(self.map, self.num_samples, iteration=500)
-            self.samples, self.gaussian_nodes = cvt_instance.get_CVT()
+            cvt_instance = CVT(self.raw_map, self.num_samples, iteration=500)
+            samples, gaussian_nodes = cvt_instance.get_CVT()
+            self.samples.extend(samples)
+            self.gaussian_nodes.extend(gaussian_nodes)
 
         elif sampling_strategy == "UNIFORM_WITH_RADIUS":
-            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
             while len(self.samples) < self.num_samples:
                 x = np.random.uniform(min_x, max_x)
                 y = np.random.uniform(min_y, max_y)
 
                 # covariance will be automatically updated.
                 node = np.array((x, y))
-                if not self.map.is_radius_collision(node, self.safety_radius):
+                if not self.raw_map.is_radius_collision(node, self.safety_radius):
                     radius = np.inf
-                    for obs in self.map.obstacles:
+                    for obs in self.raw_map.obstacles:
                         radius = min(radius, obs.get_dist(node))
                     g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                     self.samples.append(node)               
                     self.gaussian_nodes.append(g_node)
 
         elif sampling_strategy == "UNIFORM_HALTON":
-            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
             halton_sampler = Halton(d=2) # 2d Halton sampler
 
             while len(self.samples) < self.num_samples:
                 num_to_generate = max(self.num_samples * 2, 100)
                 samples = halton_sampler.random(num_to_generate)
-                nodes = samples * np.array([self.map.width, self.map.height])
+                nodes = samples * np.array([self.raw_map.width, self.raw_map.height])
 
                 # covariance will be automatically updated.
                 for node in nodes:
-                    if not self.map.is_point_collision(node):
+                    if not self.raw_map.is_point_collision(node):
                         radius = np.inf
-                        for obs in self.map.obstacles:
+                        for obs in self.raw_map.obstacles:
                             radius = min(radius, obs.get_dist(node))
                         g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                         self.samples.append(node)               
@@ -172,19 +164,19 @@ class GaussianPRM:
                             break
 
         elif sampling_strategy == "UNIFORM_HALTON_RADIUS":
-            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
             halton_sampler = Halton(d=2) # 2d Halton sampler
 
             while len(self.samples) < self.num_samples:
                 num_to_generate = max(self.num_samples * 2, 100)
                 samples = halton_sampler.random(num_to_generate)
-                nodes = samples * np.array([self.map.width, self.map.height])
+                nodes = samples * np.array([self.raw_map.width, self.raw_map.height])
 
                 # covariance will be automatically updated.
                 for node in nodes:
-                    if not self.map.is_radius_collision(node, self.safety_radius):
+                    if not self.raw_map.is_radius_collision(node, self.safety_radius):
                         radius = np.inf
-                        for obs in self.map.obstacles:
+                        for obs in self.raw_map.obstacles:
                             radius = min(radius, obs.get_dist(node))
                         g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
                         self.samples.append(node)               
@@ -198,12 +190,12 @@ class GaussianPRM:
                 and covariance and check if the sample satisfies the CVaR condition
             """
 
-            min_x, max_x, min_y, max_y = 0, self.map.width, 0 , self.map.height
+            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
             while len(self.samples) < self.num_samples:
                 x = np.random.uniform(min_x, max_x)
                 y = np.random.uniform(min_y, max_y)
                 node = np.array((x, y))
-                if self.map.is_radius_collision(node, self.safety_radius):
+                if self.raw_map.is_radius_collision(node, self.safety_radius):
                     continue
                 
                 mean = np.array((x, y))
@@ -213,7 +205,7 @@ class GaussianPRM:
                 cov = a.T@ a # construct a random positive semidefinite cov matrix
 
                 g_node = GaussianGraphNode(mean, cov, type="RANDOM")
-                if not self.map.is_gaussian_collision(g_node,
+                if not self.raw_map.is_gaussian_collision(g_node,
                                                       collision_check_method=collision_check_method,
                                                       alpha=self.alpha, cvar_threshold=self.cvar_threshold
                                                       ):
@@ -232,17 +224,17 @@ class GaussianPRM:
 
             # Square map boundary
             map_boundary = Polygon([(0, 0), 
-                                    (0, self.map.height), 
-                                    (self.map.width, self.map.height), 
-                                    (self.map.width, 0)])  
+                                    (0, self.raw_map.height), 
+                                    (self.raw_map.width, self.raw_map.height), 
+                                    (self.raw_map.width, 0)])  
 
             hex_width = self.hex_radius * 2  # Distance between two horizontal vertices of a hexagon
             hex_height = np.sqrt(3) * self.hex_radius# Vertical distance between hexagon vertices
 
             # Create hexagonal grid points, reject points 
             grid_points = []
-            for i in range(0, self.map.width):  # Adjust range based on map size and hex size
-                for j in range(0, self.map.height):
+            for i in range(0, self.raw_map.width):  # Adjust range based on map size and hex size
+                for j in range(0, self.raw_map.height):
                     x_offset = i * hex_width * 3 / 4  # Horizontal spacing
                     y_offset = j * hex_height + (i % 2) * (hex_height / 2)  # Offset every other row
                     hex_center = Point(x_offset, y_offset)
@@ -251,7 +243,7 @@ class GaussianPRM:
 
             for x, y in grid_points:
                 hexagon = create_hexagon(x, y, self.hex_radius)
-                if not self.map.is_geometry_collision(hexagon):
+                if not self.raw_map.is_geometry_collision(hexagon):
                     node = np.array((x, y))
                     self.samples.append(node)
                     g_node = GaussianGraphNode(node, None, type="UNIFORM", 
@@ -278,14 +270,14 @@ class GaussianPRM:
 
                 # Edge must be collision free with the environment
                 edges = [(i, idx) for idx in indices \
-                         if not self.map.is_gaussian_trajectory_collision(
+                         if not self.raw_map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[i],
                              self.gaussian_nodes[idx],
                              collision_check_method=collision_check_method)]
                 self.roadmap.extend(edges)
 
         elif roadmap_method == "TRIANGULATION":
-            boundary_points = self.map.get_boundary_points(self.map.obstacles, 10)
+            boundary_points = self.raw_map.get_boundary_points(self.raw_map.obstacles, 10)
             points = np.concat(( self.samples, boundary_points))
             tri = Delaunay(points)
             for i, simplex in enumerate(tri.simplices):
@@ -295,9 +287,9 @@ class GaussianPRM:
                         and (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
                         and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
-                        and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
+                        and not self.raw_map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
                                                            self.gaussian_nodes[simplex[i+1]].mean) \
-                        and not self.map.is_gaussian_trajectory_collision(
+                        and not self.raw_map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[simplex[i]],
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method, num_samples=20):
@@ -309,44 +301,11 @@ class GaussianPRM:
                             g_node1.mean, g_node1.covariance,
                             g_node2.mean, g_node2.covariance))
 
-        elif roadmap_method == "TRIANGULATION_TEST":
-            boundary_points = self.map.get_boundary_points(self.map.obstacles, 10)
-            samples = np.array(self.samples)
-            points = np.concat((samples, boundary_points))
-            tri = Delaunay(points)
-            edges = []
-            full_edges = []
-
-            for simplex in tri.simplices:
-
-                for i in range(-1, 2):
-                    full_edges.append([points[simplex[i]], points[simplex[i+1]]])
-                    if not ((boundary_points == (points[simplex[i]])).all(1).any())\
-                       and not ((boundary_points == (points[simplex[i+1]])).all(1).any()):
-                        edges.append([points[simplex[i]], points[simplex[i+1]]])
-            return boundary_points, self.samples, points, edges, full_edges
-                    # if (points[simplex[i]]) not in boundary_points and (points[simplex[i+1]]) not in boundary_points \
-                    #     and (simplex[i], simplex[i+1]) not in self.roadmap \
-                    #     and (simplex[i+1], simplex[i]) not in self.roadmap \
-                    #     and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
-                    #     and not self.map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
-                    #                                        self.gaussian_nodes[simplex[i+1]].mean) \
-                    #     and not self.map.is_gaussian_trajectory_collision(
-                    #          self.gaussian_nodes[simplex[i]],
-                    #          self.gaussian_nodes[simplex[i+1]],
-                    #          collision_check_method=collision_check_method, num_samples=20):
-                    #     self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
-                    #     # Add path cost
-                    #     g_node1 = self.gaussian_nodes[int(simplex[i])]
-                    #     g_node2 = self.gaussian_nodes[int(simplex[i+1])]
-                    #     self.roadmap_cost.append(gaussian_wasserstein_distance(
-                    #         g_node1.mean, g_node1.covariance,
-                    #         g_node2.mean, g_node2.covariance))
     def get_bounding_polygon(self):
         """
             Get bounding polygons of the map
         """
-        return self.map.get_bounding_polygon()
+        return self.raw_map.get_bounding_polygon()
 
     def get_macro_solution(self, flow_dict):
         macro_solution = {}
@@ -375,15 +334,21 @@ class GaussianPRM:
         """
             Get obstacles in the space
         """
-        return self.map.get_obstacles()
+        return self.raw_map.get_obstacles()
 
-    def get_solution_cost(self, solution):
+    def get_agent_assignment(self, num_agents, weights):
         """
-            Given solution as Gaussin node indices, compute the transport cost
-            of the swarm.
-            TODO: Implement this 
+            Assign agents according to weights. Redistribute the agents to respect the sum of agents
         """
-        pass
+        raw_allocation  = [f * num_agents for f in weights]
+        int_allocation  = [int(f * num_agents) for f in weights]
+        total_assigned = sum(int_allocation)
+        remaining_agents = num_agents - total_assigned
+        decimal_parts = [(i, raw_allocation[i] - int_allocation[i]) for i in range(len(weights))]
+        decimal_parts.sort(key=lambda x: x[1], reverse=True)
+        for i in range(remaining_agents):
+            int_allocation[decimal_parts[i][0]] += 1  # Increment based on largest decimal parts
+        return int_allocation
 
     def get_solution(self, flow_dict, timestep, num_agent):
         """
@@ -517,7 +482,7 @@ class GaussianPRM:
             goal.visualize_gaussian(ax=ax, cmap="Blues")
             # goal.visualize(ax=ax, edgecolor="green")
 
-        for obs in self.map.obstacles:
+        for obs in self.raw_map.obstacles:
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
                 # ax.plot(x, y, 'ro', markersize=3)
@@ -527,8 +492,8 @@ class GaussianPRM:
                 ax.fill(x, y, fc="black")
 
         ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.map.width)
-        ax.set_ylim(bottom=0, top=self.map.height)
+        ax.set_xlim(left=0, right=self.raw_map.width)
+        ax.set_ylim(bottom=0, top=self.raw_map.height)
         # plt.savefig("{}.png".format(fname))
         return fig, ax
     
@@ -549,7 +514,7 @@ class GaussianPRM:
         for goal in self.goals:
             goal.visualize_gaussian(ax=ax, cmap="Blues")
 
-        for obs in self.map.obstacles:
+        for obs in self.raw_map.obstacles:
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
                 # ax.plot(x, y, 'ro', markersize=3)
@@ -559,7 +524,7 @@ class GaussianPRM:
                 ax.fill(x, y, fc="black")
 
         ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.map.width)
-        ax.set_ylim(bottom=0, top=self.map.height)
+        ax.set_xlim(left=0, right=self.raw_map.width)
+        ax.set_ylim(bottom=0, top=self.raw_map.height)
         # plt.savefig("{}.png".format(fname), dpi=400)
         return fig, ax

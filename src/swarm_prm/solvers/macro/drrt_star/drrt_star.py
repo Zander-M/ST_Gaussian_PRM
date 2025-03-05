@@ -13,7 +13,7 @@ from swarm_prm.utils.gaussian_prm import GaussianPRM
 from swarm_prm.solvers.macro.drrt_star import johnsons_algorithm
 
 class DRRT_Star:
-    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
+    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, starts_agent_count, goals_agent_count, 
                  max_time=30, iterations=1):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
@@ -24,39 +24,38 @@ class DRRT_Star:
         self.gaussian_prm = gaussian_prm
         self.nodes = np.array(self.gaussian_prm.samples)
         self.num_agents = num_agents
-        self.roadmap = self.gaussian_prm.map
+        self.roadmap = self.gaussian_prm.raw_map
         self.roadmap_neighbors = self.build_neighbors()
         self.shortest_distance = johnsons_algorithm(self.roadmap_neighbors)
+        self.starts_agent = starts_agent_count
+        self.goals_agent = goals_agent_count
         self.max_time = max_time
         self.iterations = iterations
         self.agent_radius = agent_radius
-
-        # Initialize problem instance
-        self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
-        self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
 
         # Finding target assignments
         self.start_state, self.goal_state = self.get_assignment()
 
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
+        # print(self.node_capacity) # TEST
 
         # Verify if instance is feasible
         for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= int(self.num_agents*self.gaussian_prm.starts_weight[i]),\
+            assert self.node_capacity[start] >= self.starts_agent[i], \
                 "Start capacity smaller than required."
 
         for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= int(self.num_agents*self.gaussian_prm.goals_weight[i]), \
+            assert self.node_capacity[goal] >= self.goals_agent[i], \
                 "Goal capacity smaller than required."
 
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.current_node_capacity[start_idx] = self.start_agent_count[i]
+            self.current_node_capacity[start_idx] = self.starts_agent[i]
         
         # initialize agent location
         self.start_agent_node_idx = []
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.start_agent_node_idx += [start_idx] * self.start_agent_count[i]
+            self.start_agent_node_idx += [start_idx] * self.starts_agent[i]
         self.start_agent_node_idx = tuple(self.start_agent_node_idx)
         self.visited_states = {self.start_agent_node_idx}
         
@@ -222,13 +221,13 @@ class DRRT_Star:
         starts = []
         starts_idx = []
         for i, g_node in enumerate(self.gaussian_prm.starts):
-            starts += [g_node.get_mean()] * self.start_agent_count[i] 
-            starts_idx += [self.gaussian_prm.starts_idx[i]] * self.start_agent_count[i]
+            starts += [g_node.get_mean()] * self.starts_agent[i] 
+            starts_idx += [self.gaussian_prm.starts_idx[i]] * self.starts_agent[i]
         goals = []
         goals_idx = []
         for i, g_node in enumerate(self.gaussian_prm.goals):
-            goals += [g_node.get_mean()] * self.goal_agent_count[i]
-            goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goal_agent_count[i]
+            goals += [g_node.get_mean()] * self.goals_agent[i]
+            goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goals_agent[i]
 
         distance_matrix = cdist(starts, goals)
         row_ind, col_ind = linear_sum_assignment(distance_matrix)
@@ -256,12 +255,14 @@ class DRRT_Star:
     def verify_node(self, node):
         """
             Verify if new state is valid
-            Return false if node capacity exceeded
+            Return false if multiple agents at same node
         """
-        count = np.zeros(len(self.nodes))
-        for i in node:
-            count[i] += 1
-        return all(self.node_capacity - count) # guarantee if all node capacity > agent count
+        states = set()
+        for state in node:
+            if state in states:
+                return False
+            states.add(state)
+        return True
 
     def verify_connect(self, node1, node2):
         """

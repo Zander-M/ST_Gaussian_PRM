@@ -4,34 +4,38 @@
 """
 
 from collections import defaultdict, deque
+import time
 from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.mcf import MinCostFlowSolver 
+from swarm_prm.solvers.macro.teg_mcf import MinCostFlowSolver 
 
 # distinguish nodes
 
 IN_NODE = 0
 OUT_NODE = 1 
 
-def dd():
-    return defaultdict()
-
 class TEG_MCF:
-    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, max_timestep=100) -> None:
+    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, start_agents, goal_agents, \
+                 flow_constraint, max_time=30) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
         self.num_agents = num_agents
-        self.max_timestep = max_timestep
+        self.start_agents = start_agents # number of agents at each start  
+        self.goal_agents = goal_agents   # number of agents at each goal
+        self.max_time = max_time 
+
+        self.flow_constraint = flow_constraint # treat previous flow as constraints
+
         self.roadmap, self.cost_dict = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
         self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
 
         # Verify if instance is feasible
         for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= int(self.num_agents*self.gaussian_prm.starts_weight[i]),\
+            assert self.node_capacity[start] >= self.start_agents[i], \
                 "Start capacity smaller than required."
 
         for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= int(self.num_agents*self.gaussian_prm.goals_weight[i]), \
+            assert self.node_capacity[goal] >= self.goal_agents[i], \
                 "Goal capacity smaller than required."
 
     def get_min_timestep(self):
@@ -81,15 +85,12 @@ class TEG_MCF:
 
         # Adding super source and super goal to the graph
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source][(start_idx, 0, IN_NODE)] = \
-                int(self.num_agents*self.gaussian_prm.starts_weight[i])
+            teg[super_source][(start_idx, 0, IN_NODE)] = self.start_agents[i] 
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
-                int(self.num_agents*self.gaussian_prm.goals_weight[i])
-
-        # adding graph edges
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goal_agents[i]
+                    # adding graph edges
         for t in range(timestep):
             for u in self.roadmap:
                 for v in self.roadmap[u]:
@@ -126,8 +127,7 @@ class TEG_MCF:
         ### TEG
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
-                int(self.num_agents*self.gaussian_prm.goals_weight[i])
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goal_agents[i] 
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
         # update edges
@@ -160,7 +160,7 @@ class TEG_MCF:
             residual_graph[(goal_idx, timestep, IN_NODE)][(goal_idx, timestep, OUT_NODE)] = self.node_capacity[goal_idx] - flow
             residual_graph[(goal_idx, timestep, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = flow
 
-            residual_graph[(goal_idx, timestep, OUT_NODE)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.num_agents) - flow
+            residual_graph[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goal_agents[i] - flow
             residual_graph[super_sink][(goal_idx, timestep, OUT_NODE)] = flow
 
             cost_graph[(goal_idx, timestep, OUT_NODE)][super_sink] = 0
@@ -171,11 +171,12 @@ class TEG_MCF:
             del cost_graph[(goal_idx, timestep-1, OUT_NODE)][super_sink]
             del cost_graph[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
-    def get_earliest_timestep(self):
+    def get_solution(self):
         """
-            Find earliest timestep such that the graph reaches target flow
+            Find Minimum Cost Flow within the available time
         """
         # start from minimum path lengh between start and goal
+        start_time = time.time()
         timestep = self.get_min_timestep()
         max_flow = 0
         cost = 0
@@ -183,19 +184,16 @@ class TEG_MCF:
         super_source, super_sink, teg = self.build_teg(timestep)
         residual_graph, cost_graph = self.build_residual_graph_cost_graph(teg)
 
-        while timestep < self.max_timestep:
+        while time.time() - start_time < self.max_time:
             max_flow, residual_graph, cost = MinCostFlowSolver(super_source, super_sink, 
-                                    residual_graph, cost_graph, initial_flow=max_flow, initial_cost=cost).solve()
-            print("Time step: ", timestep, "Max Flow: ", max_flow, "Cost: ", cost) 
-            # by construction the max flow will not exceed the target flow
-            # if max_flow == self.num_agents:
-                # flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                # return timestep, flow_dict, residual_graph
+                                    residual_graph, cost_graph, self.flow_constraint, 
+                                    initial_flow=max_flow, initial_cost=cost).solve()
+            if timestep % 100 == 0:
+                print("Time step: ", timestep, "Max Flow: ", max_flow, "Cost: ", cost) 
             timestep += 1
             self.update_residual_graph_cost_graph(teg, residual_graph, cost_graph, timestep, super_sink)
         flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
         return timestep, flow_dict, residual_graph
-        return 0, None, None
     
     def _residual_to_flow(self, teg, residual):
         """

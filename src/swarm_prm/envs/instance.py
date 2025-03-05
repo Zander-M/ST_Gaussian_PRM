@@ -13,8 +13,7 @@ from swarm_prm.utils.gaussian_utils import GaussianGraphNode
 ##### Instance #####
 
 class Instance:
-    def __init__(self, roadmap:Roadmap, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode],
-                 starts_weight, goals_weight) -> None:
+    def __init__(self, roadmap:Roadmap, starts:List[GaussianGraphNode], goals:List[GaussianGraphNode]) -> None:
         self.roadmap = roadmap
         self.starts = []
         self.goals = []
@@ -23,9 +22,6 @@ class Instance:
             self.add_start(start)
         for goal in goals:
             self.add_goal(goal)
-
-        self.starts_weight = starts_weight
-        self.goals_weight = goals_weight
 
     def add_start(self, start):
         self.starts.append(start)
@@ -187,11 +183,7 @@ class InstanceLoader:
             mean = np.array(goal["mean"]).astype(np.float32) 
             cov = np.array(goal["covariance"]).astype(np.float32).reshape((2, 2)) 
             goals.append(GaussianGraphNode(mean, cov))
-        
-        starts_weight = np.array(instance_dict["starts_weights"])
-        goals_weight = np.array(instance_dict["goals_weights"])
-
-        self.instance = Instance(roadmap, starts, goals, starts_weight, goals_weight)
+        self.instance = Instance(roadmap, starts, goals)
  
     def get_instance(self):
         return self.instance

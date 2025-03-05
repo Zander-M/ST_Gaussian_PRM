@@ -9,7 +9,7 @@ with open("notebooks/solutions/drrt_single_agent_roadmap.pkl", "rb") as f:
 num_agents = 1
 agent_radius = 1
 
-drrt_star_solver = DRRT_Star(gaussian_prm, num_agents, agent_radius)
+drrt_star_solver = DRRT_Star(gaussian_prm, num_agents, agent_radius, [], [])
 path, cost = drrt_star_solver.get_solution()
 
 # # Multi Agent
