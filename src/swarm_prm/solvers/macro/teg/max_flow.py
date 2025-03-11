@@ -2,7 +2,7 @@
     Max Flow Solver
 """
 
-from collections import defaultdict, deque
+from collections import deque
 
 class MaxFlowSolver:
     """
@@ -43,7 +43,6 @@ class MaxFlowSolver:
         backward_bound = dict()
         return backward_bound
     
-        
     def bfs(self):
         """
             BFS for finding augmenting path
@@ -137,28 +136,17 @@ class MaxFlowSolver:
     
     def solve(self):
         """
-            Finding Max Flow
+            Finding Max Flow using Edmonds Karp
         """
-        if self.search_method == "EK":
-            """
-                Edmond Karp 
-            """
-            total_flow = self.initial_flow
+        total_flow = self.initial_flow
 
-            while True:
-                path, flow = self.bidirectional_bfs()
-                if not path:
-                    break
-                self.update_flow(path, flow)
+        while True:
+            path, flow = self.bidirectional_bfs()
+            if not path:
+                break
+            self.update_flow(path, flow)
 
-                total_flow += flow
+            total_flow += flow
 
-            return total_flow, self.residual_graph 
+        return total_flow, self.residual_graph 
 
-        elif self.search_method== "BS":
-            """
-                Bulk Search
-            """
-            assert False, "Not Implemented"
-        else:
-            assert False, "Not Implemented"

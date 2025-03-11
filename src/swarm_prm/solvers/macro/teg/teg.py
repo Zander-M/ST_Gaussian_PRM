@@ -3,6 +3,8 @@
     to speed up the algorithm.
 """
 
+import time
+
 from collections import defaultdict, deque
 from swarm_prm.utils.gaussian_prm import GaussianPRM
 from swarm_prm.solvers.macro.teg.max_flow import MaxFlowSolver
@@ -18,13 +20,13 @@ def dd():
 class TEG:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
                  num_agents, starts_agent_count, goals_agent_count, 
-                 max_timestep=100) -> None:
+                 time_limit=100) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
         self.num_agents = num_agents
         self.starts_agent_count = starts_agent_count
         self.goals_agent_count = goals_agent_count
-        self.max_timestep = max_timestep
+        self.time_limit = time_limit 
         self.roadmap_graph = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
         self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
@@ -146,13 +148,13 @@ class TEG:
             residual_dict[(goal_idx, timestep, IN_NODE)][(goal_idx, timestep, OUT_NODE)] = self.node_capacity[goal_idx] - flow
             residual_dict[(goal_idx, timestep, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = flow
 
-            residual_dict[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
+            residual_dict[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i] - flow
             residual_dict[super_sink][(goal_idx, timestep, OUT_NODE)] = flow
 
             del residual_dict[(goal_idx, timestep-1, OUT_NODE)][super_sink]
             del residual_dict[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
-    def get_earliest_timestep(self):
+    def get_solution(self):
         """
             Find earliest timestep such that the graph reaches target flow
         """
@@ -163,19 +165,19 @@ class TEG:
         super_source, super_sink, teg = self.build_teg(timestep)
         residual_graph = self.build_residual_graph(teg)
 
-        paths = []
-        while timestep < self.max_timestep:
+        start_time = time.time()
+        while time.time() - start_time < self.time_limit:
             max_flow, residual_graph = MaxFlowSolver(teg, super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
-            # print("timestep:", timestep, "max_flow:", max_flow)
             print("Time step: ", timestep, "Max Flow: ", max_flow)
+
             # by construction the max flow will not exceed the target flow
             if max_flow == self.num_agents:
                 flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
                 return timestep, flow_dict, residual_graph
             timestep += 1
             self.update_teg_residual_dict(teg, residual_graph, timestep, super_sink)
-
+        print("Timelimit Exceeded.")
         return None, None, None 
     
     def _residual_to_flow(self, teg, residual):
