@@ -15,11 +15,15 @@ OUT_NODE = 1
 def dd():
     return defaultdict()
 
-class TEGGraph:
-    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, num_agents, max_timestep=100) -> None:
+class TEG:
+    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
+                 num_agents, starts_agent_count, goals_agent_count, 
+                 max_timestep=100) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
         self.num_agents = num_agents
+        self.starts_agent_count = starts_agent_count
+        self.goals_agent_count = goals_agent_count
         self.max_timestep = max_timestep
         self.roadmap_graph = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
@@ -27,11 +31,11 @@ class TEGGraph:
 
         # Verify if instance is feasible
         for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= int(self.num_agents*self.gaussian_prm.starts_weight[i]),\
+            assert self.node_capacity[start] >= self.starts_agent_count[i],\
                 "Start capacity smaller than required."
 
         for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= int(self.num_agents*self.gaussian_prm.goals_weight[i]), \
+            assert self.node_capacity[goal] >= self.goals_agent_count[i], \
                 "Goal capacity smaller than required."
 
     def get_min_timestep(self):
@@ -79,13 +83,12 @@ class TEGGraph:
         # Adding super source and super goal to the graph
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source][(start_idx, 0, IN_NODE)] = \
-                int(self.num_agents*self.gaussian_prm.starts_weight[i])
+            teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i]
+                
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
-                int(self.num_agents*self.gaussian_prm.goals_weight[i])
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
 
         # adding graph edges
         for t in range(timestep):
@@ -114,8 +117,7 @@ class TEGGraph:
         ### TEG
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = \
-                int(self.num_agents*self.gaussian_prm.goals_weight[i])
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
         # update edges
@@ -144,7 +146,7 @@ class TEGGraph:
             residual_dict[(goal_idx, timestep, IN_NODE)][(goal_idx, timestep, OUT_NODE)] = self.node_capacity[goal_idx] - flow
             residual_dict[(goal_idx, timestep, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = flow
 
-            residual_dict[(goal_idx, timestep, OUT_NODE)][super_sink] = int(self.gaussian_prm.goals_weight[i]*self.num_agents) - flow
+            residual_dict[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
             residual_dict[super_sink][(goal_idx, timestep, OUT_NODE)] = flow
 
             del residual_dict[(goal_idx, timestep-1, OUT_NODE)][super_sink]
@@ -170,11 +172,11 @@ class TEGGraph:
             # by construction the max flow will not exceed the target flow
             if max_flow == self.num_agents:
                 flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                return max_flow, flow_dict, timestep, teg, paths, residual_graph
+                return timestep, flow_dict, residual_graph
             timestep += 1
             self.update_teg_residual_dict(teg, residual_graph, timestep, super_sink)
 
-        return None, None, None, None, None, None
+        return None, None, None 
     
     def _residual_to_flow(self, teg, residual):
         """
