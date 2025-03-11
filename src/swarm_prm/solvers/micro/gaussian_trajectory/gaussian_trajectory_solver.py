@@ -141,7 +141,7 @@ class GaussianTrajectorySolver:
                 curr_agent_idx += 1
 
         
-        for t in range(self.timestep):
+        for t in range(self.timestep+1):
       
             # Reset Agent assingment
             self.agent_assigned = [False] * self.num_agents

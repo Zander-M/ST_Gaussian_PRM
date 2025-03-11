@@ -173,13 +173,13 @@ def johns_ellipsoid_edge_constraints(polygon: Polygon):
     obj = cp.Maximize(cp.log_det(B))
 
     # Solve the convex optimization problem
-    prob = cp.Problem(obj, constraints)
+    prob = cp.Problem(obj, constraints) # type: ignore
     prob.solve()
 
     if prob.status in ["optimal", "optimal_inaccurate"]:
         # Transform the ellipsoid back to the original space
         t = np.diag(1/transform_matrix)
-        return t@B.value, -t@(offset.squeeze() - d.value)
+        return t@B.value, -t@(offset.squeeze() - d.value) # type: ignore
 
     else:
         print(prob.status)
