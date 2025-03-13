@@ -20,12 +20,15 @@ def dd():
 class TEG:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
                  num_agents, starts_agent_count, goals_agent_count, 
+                 teg=None, residual_graph=None,
                  time_limit=100) -> None:
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
         self.num_agents = num_agents
         self.starts_agent_count = starts_agent_count
         self.goals_agent_count = goals_agent_count
+        self.teg = teg
+        self.residual_graph = residual_graph
         self.time_limit = time_limit 
         self.roadmap_graph = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
@@ -86,7 +89,6 @@ class TEG:
 
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i]
-                
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
