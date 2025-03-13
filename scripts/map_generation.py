@@ -57,6 +57,12 @@ maps = {
                 "starts" : np.array([[20, 50], [50, 20]]),
                 "goals" : np.array([[80, 50], [50, 80]])
                 },
+        "multiagent": {
+            "roadmap": Roadmap(200, 200),
+            "obstacles": [], 
+            "starts" : np.array([[70, 50], [70, 150], [130, 50], [130, 150]]), 
+            "goals" : np.array([[25, 50], [25, 150], [175, 50], [175, 150]])
+        }
         }
 
 if __name__ == "__main__":
