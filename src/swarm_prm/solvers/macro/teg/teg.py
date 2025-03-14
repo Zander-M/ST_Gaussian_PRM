@@ -20,16 +20,27 @@ def dd():
 class TEG:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
                  num_agents, starts_agent_count, goals_agent_count, 
-                 teg=None, residual_graph=None,
+                 flow_dict=defaultdict(lambda:defaultdict(int)), 
+                 capacity_dict = defaultdict(lambda: 0),
+                 timestep=0,
                  time_limit=100) -> None:
+
+        # Problem instance
         self.gaussian_prm = gaussian_prm
         self.agent_radius = agent_radius
         self.num_agents = num_agents
         self.starts_agent_count = starts_agent_count
         self.goals_agent_count = goals_agent_count
-        self.teg = teg
-        self.residual_graph = residual_graph
+
+        # Flow constraints
+        self.flow_dict = flow_dict # existing flow on graph
+        self.capacity_dict = capacity_dict
+        self.timestep = timestep   # current solution time
+
+        # Search Constraints
         self.time_limit = time_limit 
+
+        # Initialization
         self.roadmap_graph = self.build_roadmap_graph()
         self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
         self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
@@ -86,7 +97,6 @@ class TEG:
         super_sink = ("SG", None, IN_NODE)
 
         # Adding super source and super goal to the graph
-
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i]
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
@@ -94,12 +104,25 @@ class TEG:
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
 
+        import pprint
+        print("TEG: ")
+        pprint.pprint(teg)
+
         # adding graph edges
         for t in range(timestep):
             for u in self.roadmap_graph:
+
+                # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
+                teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]-self.capacity_dict[u, t+1]  
+
+                # Edge between states
                 for v in self.roadmap_graph[u]:
-                    teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
-                    teg[(v, t+1, IN_NODE)][(v, t+1, OUT_NODE)] = self.node_capacity[v]
+
+                    # check if inverse edge between different nodes exists. Edge Constraint
+                    if (u != v) and (u, t+1) in self.flow_dict[(v, t)]: # type: ignore
+                        continue
+                    else:
+                        teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
 
         return super_source, super_sink, teg 
     
@@ -176,7 +199,8 @@ class TEG:
             # by construction the max flow will not exceed the target flow
             if max_flow == self.num_agents:
                 flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                return timestep, flow_dict, residual_graph
+                capacity_dict = self._flow_to_capacity(flow_dict)
+                return timestep, flow_dict, capacity_dict   
             timestep += 1
             self.update_teg_residual_dict(teg, residual_graph, timestep, super_sink)
         print("Timelimit Exceeded.")
@@ -197,3 +221,17 @@ class TEG:
                             flow_dict[(u[0], u[1])][(v[0], v[1])] = flow
             
         return flow_dict
+    
+    def _flow_to_capacity(self, flow_dict):
+        """
+            Construct capacity dict indexed by (node, timestep), representing available flow
+        """
+        capacity_dict = defaultdict(lambda:0)
+        for u in flow_dict:
+            if u == ("SS", None):
+                continue
+            for v in flow_dict[u]:
+                if v == ("SG", None):
+                    continue
+                capacity_dict[v] += flow_dict[u][v]
+        return capacity_dict
