@@ -308,6 +308,9 @@ class GaussianPRM:
         return self.raw_map.get_bounding_polygon()
 
     def get_macro_solution(self, flow_dict):
+        """
+            Get macro solution indexed by timestep
+        """
         macro_solution = {}
 
         for in_node in flow_dict:

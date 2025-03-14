@@ -148,7 +148,7 @@ class GaussianTrajectorySolver:
 
             # Index incoming flows for each target node
             incoming_flow = defaultdict(list)
-            for prev_node in self.macro_solution[t].keys():
+            for prev_node in self.macro_solution[t]:
                 for node, flow in self.macro_solution[t][prev_node]:
                     incoming_flow[node].append((prev_node, flow))
             
@@ -156,12 +156,12 @@ class GaussianTrajectorySolver:
             trajectories = []
             
             moving_agents = 0
-            for node in incoming_flow.keys():
+            for node in incoming_flow:
                 for flow in incoming_flow[node]:
                     moving_agents += flow[1]
 
             # sample new locations in goal nodes
-            for node in incoming_flow.keys():
+            for node in incoming_flow:
                 # gather all agents coming to the same goal
                 incoming_agents = []
                 for prev_node, flow in incoming_flow[node]:
