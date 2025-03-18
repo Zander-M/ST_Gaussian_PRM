@@ -20,8 +20,8 @@ def dd():
 class TEG:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
                  num_agents, starts_agent_count, goals_agent_count, 
-                 flow_dict=defaultdict(lambda:defaultdict(int)), 
-                 capacity_dict = defaultdict(lambda: 0),
+                 flow_dicts=[], 
+                 capacity_dicts = [],
                  timestep=0,
                  time_limit=100) -> None:
 
@@ -33,8 +33,8 @@ class TEG:
         self.goals_agent_count = goals_agent_count
 
         # Flow constraints
-        self.flow_dict = flow_dict # existing flow on graph
-        self.capacity_dict = capacity_dict
+        self.flow_dicts = flow_dicts # existing flow on graph
+        self.capacity_dicts = capacity_dicts
         self.timestep = timestep   # current solution time
 
         # Search Constraints
@@ -104,23 +104,27 @@ class TEG:
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
 
-        import pprint
-        print("TEG: ")
-        pprint.pprint(teg)
-
         # adding graph edges
         for t in range(timestep):
             for u in self.roadmap_graph:
 
                 # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
-                teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]-self.capacity_dict[u, t+1]  
+                teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]  
+                for capacity_dict in self.capacity_dicts:
+                    teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] -= capacity_dict[u, t+1]
 
                 # Edge between states
                 for v in self.roadmap_graph[u]:
-
                     # check if inverse edge between different nodes exists. Edge Constraint
-                    if (u != v) and (u, t+1) in self.flow_dict[(v, t)]: # type: ignore
-                        continue
+                    if (u != v):
+                        edge_exists = False
+                        for flow_dict in self.flow_dicts:
+                            if (u, t+1) in flow_dict[(v, t)]: # type: ignore
+                                # print("edge_exist!") # TESTT
+                                edge_exists = True
+                                break
+                        if not edge_exists:
+                            teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
                     else:
                         teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
 
@@ -194,7 +198,7 @@ class TEG:
         while time.time() - start_time < self.time_limit:
             max_flow, residual_graph = MaxFlowSolver(teg, super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
-            print("Time step: ", timestep, "Max Flow: ", max_flow)
+            # print("Time step: ", timestep, "Max Flow: ", max_flow) # TESTT
 
             # by construction the max flow will not exceed the target flow
             if max_flow == self.num_agents:
