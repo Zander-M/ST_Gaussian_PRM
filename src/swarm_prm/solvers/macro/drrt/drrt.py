@@ -1,7 +1,7 @@
 """
     DRRT for continuous space motion planning
     https://arxiv.org/pdf/1903.00994
-    This version does not have rewiring behavior and does not use a heuristic
+    This version does not have rewiring behavior and does not use a heuristic for efficiency
 """
 from collections import defaultdict
 
@@ -15,7 +15,8 @@ from swarm_prm.utils.gaussian_prm import GaussianPRM
 
 class DRRT:
     def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
-                 goal_state_prob=0.1, max_time=6000, iterations=10):
+                 starts_agent_count, goals_agnet_count,
+                 goal_state_prob=0.1, time_limit=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -27,14 +28,15 @@ class DRRT:
         self.num_agents = num_agents
         self.roadmap = self.gaussian_prm.raw_map
         self.roadmap_neighbors = self.build_neighbors()
-        self.max_time = max_time
+        self.time_limit = time_limit
         self.iterations = iterations
         self.agent_radius = agent_radius
-        self.goal_state_prob = goal_state_prob
+
+        self.goal_state_prob = goal_state_prob # With random probability we sample goal states
 
         # Initialize problem instance
-        self.start_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.starts_weight]
-        self.goal_agent_count = [int(w*self.num_agents) for w in self.gaussian_prm.goals_weight]
+        self.start_agent_count = starts_agent_count
+        self.goal_agent_count = goals_agnet_count
 
         self.goal_state = self.get_assignment()
 
@@ -179,7 +181,7 @@ class DRRT:
             Get solution per agent
         """
         start_time = time.time()
-        while time.time() - start_time < self.max_time:
+        while time.time() - start_time < self.time_limit:
             for _ in range(self.iterations):
                 self.expand()
             if self.goal_state in self.visited_states:
