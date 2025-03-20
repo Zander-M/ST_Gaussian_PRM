@@ -22,7 +22,7 @@ class TEG:
                  num_agents, starts_agent_count, goals_agent_count, 
                  flow_dicts=[], 
                  capacity_dicts = [],
-                 timestep=0,
+                 max_timestep=0,
                  time_limit=100) -> None:
 
         # Problem instance
@@ -35,7 +35,7 @@ class TEG:
         # Flow constraints
         self.flow_dicts = flow_dicts # existing flow on graph
         self.capacity_dicts = capacity_dicts
-        self.timestep = timestep   # current solution time
+        self.max_timestep = max_timestep   # current solution time
 
         # Search Constraints
         self.time_limit = time_limit 
@@ -119,13 +119,13 @@ class TEG:
                     if (u != v):
                         edge_exists = False
                         for flow_dict in self.flow_dicts:
-                            if (u, t+1) in flow_dict[(v, t)]: # type: ignore
+                            if (v, t) in flow_dict and (u, t+1) in flow_dict[(v, t)]:
                                 # print("edge_exist!") # TESTT
                                 edge_exists = True
                                 break
                         if not edge_exists:
                             teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
-                    else:
+                    else: # wait edges
                         teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
 
         return super_source, super_sink, teg 
@@ -188,7 +188,7 @@ class TEG:
             Find earliest timestep such that the graph reaches target flow
         """
         # start from minimum path lengh between start and goal
-        timestep = self.get_min_timestep()
+        timestep = max(self.get_min_timestep(), self.max_timestep)
         max_flow = 0
 
         super_source, super_sink, teg = self.build_teg(timestep)

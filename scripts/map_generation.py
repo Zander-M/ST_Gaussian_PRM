@@ -41,7 +41,7 @@ maps = {
                                 Obstacle(None, "POLYGON", [(30, 100), (30, 60), (70, 60), (70, 100)])
                             ], 
                 "starts" : np.array([[10, 10], [90, 10]]), 
-                "goals" : np.array([[90, 90], [10, 90]])             
+                "goals" : np.array([[10, 90], [90, 90]])
                 },
         "obstacle":{
                 "roadmap" : Roadmap(200, 160), 
