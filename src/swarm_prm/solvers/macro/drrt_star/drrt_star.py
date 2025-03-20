@@ -10,11 +10,12 @@ from scipy.optimize import linear_sum_assignment
 import time
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.drrt_star import johnsons_algorithm
+from swarm_prm.utils.johnson import johnsons_algorithm
 
 class DRRT_Star:
-    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, starts_agent_count, goals_agent_count, 
-                 max_time=30, iterations=1):
+    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
+                 starts_agent_count, goals_agent_count, num_agents,
+                 time_limit=30, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -29,7 +30,7 @@ class DRRT_Star:
         self.shortest_distance = johnsons_algorithm(self.roadmap_neighbors)
         self.starts_agent = starts_agent_count
         self.goals_agent = goals_agent_count
-        self.max_time = max_time
+        self.time_limit = time_limit
         self.iterations = iterations
         self.agent_radius = agent_radius
 
@@ -241,7 +242,7 @@ class DRRT_Star:
         """
         start_time = time.time()
         v_last = self.start_state
-        while time.time() - start_time < self.max_time:
+        while time.time() - start_time < self.time_limit:
             for _ in range(self.iterations):
                 v_last = self.expand_drrt_star(v_last)
             

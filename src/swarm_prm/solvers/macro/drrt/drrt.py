@@ -12,10 +12,11 @@ from scipy.optimize import linear_sum_assignment
 import time
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
+from swarm_prm.utils.johnson import johnsons_algorithm
 
 class DRRT:
-    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius,
-                 starts_agent_count, goals_agnet_count,
+    def __init__(self, gaussian_prm:GaussianPRM, agent_radius,
+                 starts_agent_count, goals_agent_count, num_agents,
                  goal_state_prob=0.1, time_limit=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
@@ -28,6 +29,7 @@ class DRRT:
         self.num_agents = num_agents
         self.roadmap = self.gaussian_prm.raw_map
         self.roadmap_neighbors = self.build_neighbors()
+        self.shortest_distance = johnsons_algorithm(self.roadmap_neighbors)
         self.time_limit = time_limit
         self.iterations = iterations
         self.agent_radius = agent_radius
@@ -36,7 +38,7 @@ class DRRT:
 
         # Initialize problem instance
         self.start_agent_count = starts_agent_count
-        self.goal_agent_count = goals_agnet_count
+        self.goal_agent_count = goals_agent_count
 
         self.goal_state = self.get_assignment()
 
@@ -66,13 +68,13 @@ class DRRT:
         """
         graph = defaultdict(list)
 
-        for edge in self.gaussian_prm.roadmap:
+        for i, edge in enumerate(self.gaussian_prm.roadmap):
             u, v = edge
-            graph[u].append(v)
-            graph[v].append(u)
+            graph[u].append((v, self.gaussian_prm.roadmap_cost[i]))
+            graph[v].append((u, self.gaussian_prm.roadmap_cost[i]))
         
         for v in range(len(self.nodes)):
-            graph[v].append(v) # add wait edges
+            graph[v].append((v, 0)) # add wait edges
 
         return graph
 
@@ -108,20 +110,12 @@ class DRRT:
         min_dist = float("inf")
         min_state = None 
         for state in self.visited_states:
-            positions = np.array([self.nodes[node_idx] for node_idx in state])
-            random_positions = np.array([self.nodes[node_idx] for node_idx in q_rand])
-            dist = np.sum(np.linalg.norm(random_positions-positions, axis=1))
+            dist = np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(q_rand, state)])
             if dist < min_dist:
                 min_dist = dist
                 min_state = state
         return min_state
 
-    def get_cost(self, node):
-        """
-            Compute cost of node
-            TODO: update cost
-        """
-    
     def Od(self, v_near, q_rand):
         """
             Oracle steering function
@@ -136,8 +130,8 @@ class DRRT:
             norm_diff = np.linalg.norm(diff)
             random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
             neighbors = self.roadmap_neighbors[v_near[agent]]
-            cos_sim = []
-            neighbor_ids = neighbors
+            neighbor_ids = [neighbor[0] for neighbor in neighbors]
+
             neighbor_vecs = self.nodes[neighbor_ids] - current_pos
             norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
             neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
@@ -182,7 +176,7 @@ class DRRT:
         """
         start_time = time.time()
         while time.time() - start_time < self.time_limit:
-            for _ in range(self.iterations):
+            for _ in range(self.iterations): # expansion before goal state check
                 self.expand()
             if self.goal_state in self.visited_states:
                 path = self.connect_to_target(self.goal_state)
