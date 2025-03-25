@@ -4,6 +4,7 @@
     This version does not have rewiring behavior and does not use a heuristic for efficiency
 """
 from collections import defaultdict
+import random
 
 import numpy as np
 from scipy.spatial import KDTree
@@ -17,6 +18,7 @@ from swarm_prm.utils.johnson import johnsons_algorithm
 class DRRT:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius,
                  starts_agent_count, goals_agent_count, num_agents,
+                 num_random_sample = 5000,
                  goal_state_prob=0.1, time_limit=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
@@ -39,11 +41,9 @@ class DRRT:
         # Initialize problem instance
         self.start_agent_count = starts_agent_count
         self.goal_agent_count = goals_agent_count
-
         self.goal_state = self.get_assignment()
 
         # Finding target assignments
-
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
@@ -56,9 +56,17 @@ class DRRT:
         self.current_agent_node_idx = tuple(self.current_agent_node_idx)
 
         self.visited_states = {self.current_agent_node_idx}
-        
-        # DRRT structure 
 
+        # Draw random samples
+        self.random_samples = []
+        while len(self.random_samples) < num_random_sample:
+            x = np.random.uniform(0, self.roadmap.width)
+            y = np.random.uniform(0, self.roadmap.height)
+            sample = (x, y)
+            if not self.roadmap.is_point_collision(sample):
+                self.random_samples.append((x, y))
+
+        # DRRT structure 
         self.cost = {self.current_agent_node_idx:0} # cost
         self.tree = {self.current_agent_node_idx: None} # parent
 
@@ -93,7 +101,7 @@ class DRRT:
         """
             Expand DRRT 
         """
-        q_rand = np.random.randint(0, len(self.nodes), size=(self.num_agents))
+        q_rand = random.choices(self.random_samples, k=self.num_agents)
         v_near = self.nearest_neighbor(q_rand)
         v_new = self.Od(v_near, q_rand)
         if v_new not in self.visited_states\
@@ -110,7 +118,8 @@ class DRRT:
         min_dist = float("inf")
         min_state = None 
         for state in self.visited_states:
-            dist = np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(q_rand, state)])
+            state_locations = [self.nodes[v] for v in state]
+            dist = np.sum([np.linalg.norm(v1-v2) for v1, v2 in zip(q_rand, state_locations)])
             if dist < min_dist:
                 min_dist = dist
                 min_state = state
@@ -122,20 +131,20 @@ class DRRT:
         """
         next_state = []
         for agent in range(self.num_agents):
-            if v_near[agent] == q_rand[agent]:
-                next_state.append(v_near[agent]) # if samples the same state, just wait.
+            if v_near[agent] == self.goal_state[agent]:
+                # Agent wait at goal
+                next_state.append(v_near[agent])
                 continue
             current_pos = self.nodes[v_near[agent]]
-            diff = self.nodes[q_rand[agent]] - current_pos  
+            diff = q_rand[agent] - current_pos  
             norm_diff = np.linalg.norm(diff)
             random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
             neighbors = self.roadmap_neighbors[v_near[agent]]
             neighbor_ids = [neighbor[0] for neighbor in neighbors]
-
             neighbor_vecs = self.nodes[neighbor_ids] - current_pos
             norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
             neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
-            cos_sim = neighbor_unit_vecs @ random_dir_vec
+            cos_sim = neighbor_unit_vecs @ random_dir_vec.T
             next_idx = neighbor_ids[np.argmax(cos_sim)]
             next_state.append(next_idx)
         return tuple(next_state)
