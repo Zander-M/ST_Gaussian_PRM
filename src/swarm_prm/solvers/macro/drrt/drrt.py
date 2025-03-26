@@ -88,20 +88,32 @@ class DRRT:
             path.append(curr_state)
             curr_state = self.tree[curr_state]
         return path[::-1]
+    
+    def compute_pairwise_distance(self):
+        """
+            Compute pairwise distance betwe
+        """
         
     def expand(self):
         """
             Expand DRRT 
         """
         q_rand = np.random.randint(0, len(self.nodes), size=(self.num_agents))
+        nn_time = time.time()
         v_near = self.nearest_neighbor(q_rand)
+        nn_time = time.time() - nn_time
+        Od_time = time.time()
         v_new = self.Od(v_near, q_rand)
+        Od_time = time.time() - Od_time
+        verify_time = time.time()
         if v_new not in self.visited_states\
             and self.verify_node(v_new)\
             and self.verify_connect(v_near, v_new):
 
             self.visited_states.add(v_new) # add vertex
             self.tree[v_new] = v_near # type:ignore # add edge
+        verify_time = time.time() - verify_time
+        return nn_time, Od_time, verify_time
         
     def nearest_neighbor(self, q_rand):
         """
@@ -175,13 +187,27 @@ class DRRT:
             Get solution per agent
         """
         start_time = time.time()
+        iteration = 0
+        nn_time = 0
+        Od_time = 0
+        verify_time = 0
+
         while time.time() - start_time < self.time_limit:
+            iteration += 1
             for _ in range(self.iterations): # expansion before goal state check
-                self.expand()
+                nn_t, Od_t, v_t = self.expand()
+                nn_time += nn_t
+                Od_time += Od_t
+                verify_time += v_t
             if self.goal_state in self.visited_states:
                 path = self.connect_to_target(self.goal_state)
                 print("Found solution")
                 return path, self.cost
+            if iteration % 1000 == 0:
+                print("Iteration:", iteration)
+                print("nearest neighbor time: ", nn_time)
+                print("Od time: ", Od_time)
+                print("Verify time: ", verify_time)
         print("exceeded run time")
         print(self.visited_states)
         return None, None
@@ -191,6 +217,8 @@ class DRRT:
             Verify if new state is valid
             Return false if node capacity exceeded
         """
+        unique, counts = np.unique(node, return_counts=True)
+        return np.all(self.node_capacity[unique] >= counts)
         count = np.zeros(len(self.nodes))
         for i in node:
             count[i] += 1
