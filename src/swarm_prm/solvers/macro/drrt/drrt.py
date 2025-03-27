@@ -35,6 +35,7 @@ class DRRT:
         self.time_limit = time_limit
         self.iterations = iterations
         self.agent_radius = agent_radius
+        self.random_samples = self.get_random_samples()
 
         self.goal_state_prob = goal_state_prob # With random probability we sample goal states
 
@@ -55,7 +56,9 @@ class DRRT:
             self.current_agent_node_idx += [start_idx] * self.start_agent_count[i]
         self.current_agent_node_idx = tuple(self.current_agent_node_idx)
 
-        self.visited_states = {self.current_agent_node_idx}
+        self.visited_states = [self.current_agent_node_idx]
+        self.visited_states_idx = {self.current_agent_node_idx:0}
+        self.visited_states_location = np.array([[self.nodes[idx] for idx in self.current_agent_node_idx]])
 
         # Draw random samples
         self.random_samples = []
@@ -86,6 +89,12 @@ class DRRT:
 
         return graph
 
+    def check_goal_state(self):
+        """
+            Check if the goal state is reached, such that all the goal states have the desired number of agents.
+        """
+        # TODO
+
     def connect_to_target(self, goal_state):
         """
             Connect currect tree to target
@@ -106,7 +115,8 @@ class DRRT:
         """
             Expand DRRT 
         """
-        q_rand = np.random.randint(0, len(self.nodes), size=(self.num_agents))
+        indices = np.random.randint(0, len(self.random_samples), size=self.num_agents)
+        q_rand = np.array([self.random_samples[idx] for idx in indices])
         nn_time = time.time()
         v_near = self.nearest_neighbor(q_rand)
         nn_time = time.time() - nn_time
@@ -117,8 +127,10 @@ class DRRT:
         if v_new not in self.visited_states\
             and self.verify_node(v_new)\
             and self.verify_connect(v_near, v_new):
-
-            self.visited_states.add(v_new) # add vertex
+            self.visited_states.append(v_new)
+            self.visited_states_idx[v_new] = len(self.visited_states) - 1 # add vertex
+            new_state_location = np.array([[self.nodes[idx] for idx in v_new]])
+            self.visited_states_location = np.concat((self.visited_states_location, new_state_location))
             self.tree[v_new] = v_near # type:ignore # add edge
         verify_time = time.time() - verify_time
         return nn_time, Od_time, verify_time
@@ -127,11 +139,14 @@ class DRRT:
         """
             Find Nearest Neighbor in the tree
         """
+        min_state = np.argmin(np.sum(np.linalg.norm(self.visited_states_location - q_rand, axis=2), axis=1))
+        return self.visited_states[min_state]
         min_dist = float("inf")
         min_state = None 
+
         for state in self.visited_states:
-            state_locations = [self.nodes[v] for v in state]
-            dist = np.sum([np.linalg.norm(v1-v2) for v1, v2 in zip(q_rand, state_locations)])
+            state_locations = np.array([self.nodes[v] for v in state])
+            dist = np.sum(np.linalg.norm(q_rand-state_locations, axis=1))
             if dist < min_dist:
                 min_dist = dist
                 min_state = state
@@ -190,6 +205,17 @@ class DRRT:
         _, col_ind = linear_sum_assignment(distance_matrix)
         goal_state = tuple([goals_idx[idx] for idx in col_ind])
         return goal_state
+    
+    def get_random_samples(self, num_samples = 1000):
+        """
+            Generate random samples in thee available configuration space.
+        """
+        random_samples = []
+        while len(random_samples) < num_samples:
+            point = (np.random.uniform(0, self.roadmap.width), np.random.uniform(0, self.roadmap.height))
+            if not self.roadmap.is_point_collision(point):
+                random_samples.append(point)
+        return np.array(random_samples)
 
     def get_solution(self):
         """
