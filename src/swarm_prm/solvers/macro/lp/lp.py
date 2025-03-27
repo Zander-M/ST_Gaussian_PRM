@@ -3,7 +3,7 @@
 """
 from collections import defaultdict
 
-class LPSolver:
+class LP:
     def __init__(self, gaussian_prm, num_agents, agent_radius):
         self.gaussian_prm = gaussian_prm
         self.starts = self.gaussian_prm.starts_idx

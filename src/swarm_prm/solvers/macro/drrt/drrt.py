@@ -1,7 +1,7 @@
 """
     DRRT for continuous space motion planning
     https://arxiv.org/pdf/1903.00994
-    This version does not have rewiring behavior and does not use a heuristic for efficiency
+    This version does not have rewiring behavior and does not use a heuristic 
 """
 from collections import defaultdict
 import random
@@ -141,16 +141,6 @@ class DRRT:
         """
         min_state = np.argmin(np.sum(np.linalg.norm(self.visited_states_location - q_rand, axis=2), axis=1))
         return self.visited_states[min_state]
-        min_dist = float("inf")
-        min_state = None 
-
-        for state in self.visited_states:
-            state_locations = np.array([self.nodes[v] for v in state])
-            dist = np.sum(np.linalg.norm(q_rand-state_locations, axis=1))
-            if dist < min_dist:
-                min_dist = dist
-                min_state = state
-        return min_state
 
     def Od(self, v_near, q_rand):
         """
@@ -258,7 +248,6 @@ class DRRT:
         for i in node:
             count[i] += 1
         return all(self.node_capacity - count) # guarantee if all node capacity > agent count
-        
 
     def verify_connect(self, node1, node2):
         """
