@@ -4,22 +4,18 @@
     This version does not have rewiring behavior and does not use a heuristic 
 """
 from collections import defaultdict, Counter
-import random
 
 import numpy as np
-from scipy.spatial.distance import cdist
 from scipy.spatial import KDTree
-from scipy.optimize import linear_sum_assignment
 import time
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.utils.johnson import johnsons_algorithm
 
 class DRRT:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius,
                  starts_agent_count, goals_agent_count, num_agents,
                  num_random_sample = 5000,
-                 goal_state_prob=0.1, time_limit=6000, iterations=10):
+                 time_limit=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
@@ -34,7 +30,6 @@ class DRRT:
         self.time_limit = time_limit
         self.iterations = iterations
         self.agent_radius = agent_radius
-        self.random_samples = self.get_random_samples(num_random_sample)
 
         # Initialize problem instance
         self.start_agent_count = starts_agent_count
@@ -70,8 +65,8 @@ class DRRT:
         self.tree = {self.current_agent_node_idx: None} # parent
 
         # KDTree buffer
-        
-        
+        self.kd_tree_buffer_size = 100
+        self.kd_tree_buffer = []
 
     def build_neighbors(self):
         """
@@ -109,8 +104,9 @@ class DRRT:
         """
             Expand DRRT 
         """
-        indices = np.random.randint(0, len(self.random_samples), size=self.num_agents)
-        q_rand = np.array([self.random_samples[idx] for idx in indices])
+        xs = np.random.uniform(0, self.roadmap.width, self.num_agents)
+        ys = np.random.uniform(0, self.roadmap.height, self.num_agents)
+        q_rand = np.column_stack((xs, ys)) 
         nn_time = time.time()
         v_near = self.nearest_neighbor(q_rand)
         nn_time = time.time() - nn_time
@@ -133,6 +129,7 @@ class DRRT:
     def nearest_neighbor(self, q_rand):
         """
             Find Nearest Neighbor in the tree
+            We first check buffer and then check the KDTree
         """
         min_state = np.argmin(np.sum(np.linalg.norm(self.visited_states_location - q_rand, axis=2), axis=1))
         return self.visited_states[min_state]
@@ -160,47 +157,6 @@ class DRRT:
             next_idx = neighbor_ids[np.argmax(cos_sim)]
             next_state.append(next_idx)
         return tuple(next_state)
-    
-    def get_parent(self, nodes):
-        """
-            Get node parent
-        """
-        return self.tree[nodes]
-    
-    def get_distance(self, node1, node2):
-        """
-            Get node distance
-        """
-
-    def get_assignment(self):
-        """
-            Get goal assignment
-        """
-        starts = []
-        for i, g_node in enumerate(self.gaussian_prm.starts):
-            starts += [g_node.get_mean()] * self.start_agent_count[i] 
-
-        goals = []
-        goals_idx = []
-        for i, g_node in enumerate(self.gaussian_prm.goals):
-            goals += [g_node.get_mean()] * self.goal_agent_count[i]
-            goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goal_agent_count[i]
-
-        distance_matrix = cdist(starts, goals)
-        _, col_ind = linear_sum_assignment(distance_matrix)
-        goal_state = tuple([goals_idx[idx] for idx in col_ind])
-        return goal_state
-    
-    def get_random_samples(self, num_samples = 1000):
-        """
-            Generate random samples in thee available configuration space.
-        """
-        random_samples = []
-        while len(random_samples) < num_samples:
-            point = (np.random.uniform(0, self.roadmap.width), np.random.uniform(0, self.roadmap.height))
-            if not self.roadmap.is_point_collision(point):
-                random_samples.append(point)
-        return np.array(random_samples)
     
     def get_state_signature(self, state):
         """
@@ -240,6 +196,7 @@ class DRRT:
         print(self.visited_states)
         return None, None
 
+    #   Connection verification
     def verify_node(self, node):
         """
             Verify if new state is valid
