@@ -1,5 +1,4 @@
 """
-
     Linear Programming solver for finding shortest paths
 """
 from collections import defaultdict
@@ -107,12 +106,14 @@ class LP:
 
         # 1. Start location constraints
         for i, start in enumerate(self.starts):
-            start_indices = [i for i in paths if paths[0] == start]
+            start_indices = [j for j, path in enumerate(paths) if path[0] == start]
+            print("starts", start_indices)
             constraints.append(cp.sum(x[start_indices]) == self.starts_agent_count[i])
 
         # 2. Goal location constraints
         for i, goal in enumerate(self.goals):
-            goal_indices = [i for i in paths if paths[-1] == goal]
+            goal_indices = [j for j, path in enumerate(paths) if path[-1] == goal]
+            print("goals", goal_indices)
             constraints.append(cp.sum(x[goal_indices]) == self.goals_agent_count[i])
 
         # 3. Capacity constraints at intermediate nodes
@@ -127,4 +128,25 @@ class LP:
 
         # Solve
         prob = cp.Problem(cp.Minimize(cost), constraints)
-        prob.solve(solver=cp.SCIP)  # or another MILP solver
+        try:
+            prob.solve(solver=cp.SCIP, verbose=False)
+        except cp.SolverError as e:
+            print("Solver failed:", e)
+
+        # Access best available solution
+        if prob.status in [
+            cp.OPTIMAL, cp.OPTIMAL_INACCURATE,
+            cp.USER_LIMIT, cp.SOLVER_ERROR
+        ]:
+            print("Best known solution (may be suboptimal):")
+            print("Objective value:", prob.value)
+            print("x =", x.value)
+            # Convert solution to paths
+            solutions = []
+            for i, count in enumerate(x.value): # type: ignore
+                for _ in range(int(count)):
+                    solutions.append(paths[i])
+            return solutions, prob.value 
+
+        else:
+            print("No feasible solution found.")
