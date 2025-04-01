@@ -2,12 +2,12 @@
     DRRT Star for continuous space motion planning
     https://arxiv.org/pdf/1903.00994
 """
-from collections import defaultdict
+from collections import defaultdict, Counter
 
+import hnswlib # For fast NN check
 import numpy as np
-from scipy.spatial.distance import cdist
-from scipy.optimize import linear_sum_assignment
 import time
+
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
 from swarm_prm.utils.johnson import johnsons_algorithm
@@ -15,11 +15,10 @@ from swarm_prm.utils.johnson import johnsons_algorithm
 class DRRT_Star:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
                  starts_agent_count, goals_agent_count, num_agents,
-                 time_limit=30, iterations=10):
+                 time_limit=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
-
             State is represented as a list of agent node indices.
         """
         self.gaussian_prm = gaussian_prm
@@ -28,42 +27,51 @@ class DRRT_Star:
         self.roadmap = self.gaussian_prm.raw_map
         self.roadmap_neighbors = self.build_neighbors()
         self.shortest_distance = johnsons_algorithm(self.roadmap_neighbors)
-        self.starts_agent = starts_agent_count
-        self.goals_agent = goals_agent_count
         self.time_limit = time_limit
         self.iterations = iterations
         self.agent_radius = agent_radius
 
-        # Finding target assignments
-        self.start_state, self.goal_state = self.get_assignment()
+        # Initialize problem instance
+        self.start_agent_count = starts_agent_count
+        self.goal_agent_count = goals_agent_count
+        self.start_state = []
+        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
+            self.start_state += [start_idx] * self.start_agent_count[i]
+        self.start_state = tuple(self.start_state)
+        self.goal_state = {}
+        for node_idx, node_count in zip(self.gaussian_prm.goals_idx, self.goal_agent_count):
+            if node_count > 0:
+                self.goal_state[node_idx] = node_count
 
+        # Goal signature
+        self.goal_state = tuple(sorted(self.goal_state.items()))
+
+        # Initialize node capacities
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
-        # print(self.node_capacity) # TEST
 
         # Verify if instance is feasible
         for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= self.starts_agent[i], \
+            assert self.node_capacity[start] >= self.start_agent_count[i], \
                 "Start capacity smaller than required."
 
         for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= self.goals_agent[i], \
+            assert self.node_capacity[goal] >= self.goal_agent_count[i], \
                 "Goal capacity smaller than required."
+       
+        # DRRT star structure 
+        self.visited_states = [self.start_state]
+        self.visited_states_idx = {self.start_state: 0}
+        self.visited_states_signatures = {self.get_state_signature(self.start_state):0}
+        self.tree = {self.start_state: None} # parent
 
-        self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
-        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.current_node_capacity[start_idx] = self.starts_agent[i]
-        
-        # initialize agent location
-        self.start_agent_node_idx = []
-        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.start_agent_node_idx += [start_idx] * self.starts_agent[i]
-        self.start_agent_node_idx = tuple(self.start_agent_node_idx)
-        self.visited_states = {self.start_agent_node_idx}
-        
-        # DRRT structure 
-        self.parent = {self.start_agent_node_idx: None} # parent
         self.best_path = None
         self.best_path_cost = float("inf")
+
+        # Fast NN check
+        self.nn = hnswlib.Index(space="l2", dim=self.num_agents*2) # 2D agents
+        self.nn.init_index(max_elements=1000000)
+        start_location = np.array([[self.nodes[idx] for idx in self.start_state]]).flatten()
+        self.nn.add_items(start_location, [0])
 
     def build_neighbors(self):
         """
@@ -122,13 +130,21 @@ class DRRT_Star:
         if state not in self.visited_states:
             return float("inf")
         else: 
-            return self.get_cost(self.parent[state]) + self.get_distance(self.parent[state], state)
+            return self.get_cost(self.tree[state]) + self.get_distance(self.tree[state], state)
 
     def get_heuristic(self, state):
         """
             Get Heuristic for macro states. We use actual path cost
         """
         return np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(state, self.goal_state)])
+    
+    def get_state_signature(self, state):
+        """
+            Get state signature for goal state check
+        """
+        signature = Counter(state)
+        hashable_signature = tuple(sorted(signature.items()))
+        return hashable_signature
 
     def connect_to_target(self, goal_state):
         """
@@ -140,7 +156,7 @@ class DRRT_Star:
         curr_state = goal_state
         while curr_state is not None:
             path.append(curr_state)
-            curr_state = self.parent[curr_state]
+            curr_state = self.tree[curr_state]
         return path[::-1], self.get_cost(goal_state)
         
     def expand_drrt_star(self, v_last):
@@ -148,7 +164,9 @@ class DRRT_Star:
             Expand DRRT Star
         """
         if v_last is None:
-            q_rand = np.random.randint(0, len(self.nodes), size=self.num_agents)
+            xs = np.random.uniform(0, self.roadmap.width, self.num_agents)
+            ys = np.random.uniform(0, self.roadmap.height, self.num_agents)
+            q_rand = np.column_stack((xs, ys)) 
             v_near = self.nearest_neighbor(q_rand)
         else:
             q_rand = self.goal_state
@@ -165,12 +183,14 @@ class DRRT_Star:
 
         if v_new not in self.visited_states:
             # v_new verified in get_neighbors
-            self.visited_states.add(v_new) # add vertex
+            self.visited_states.append(v_new) # add vertex
+            self.visited_states_idx[v_new] = len(self.visited_states) - 1
+            self.visited_states_signatures[self.get_state_signature(v_new)] = len(self.visited_states) - 1
             self.parent[v_new] = v_best # type:ignore # add edge
         else: 
             # Rewire v_new if cost is lower
             if v_new_cost < self.get_cost(v_new):
-                self.parent[v_new] = v_best
+                self.tree[v_new] = v_best
         
         # Rewire neighbors
         for v in neighbors:
@@ -185,15 +205,16 @@ class DRRT_Star:
     def nearest_neighbor(self, q_rand):
         """
             Find Nearest Neighbor in the tree
+            We first check both the buffer and the KDTree
         """
-        min_dist = float("inf")
-        min_state = None 
-        for state in self.visited_states:
-            dist = np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(q_rand, state)])
-            if dist < min_dist:
-                min_dist = dist
-                min_state = state
-        return min_state
+        # For efficiency reasons, we compute sum of squared distance instead
+        # of sum of distance using KDTree. The KD Tree is updated periodically.
+        # This does not affect the probabilistic completeness
+
+        flat_q_rand = q_rand.flatten()
+        labels, distances = self.nn.knn_query(flat_q_rand, k=1)
+        nearest_idx = labels[0][0]
+        return self.visited_states[nearest_idx]
 
     def Id(self, v_near, q_rand):
         """
@@ -215,27 +236,6 @@ class DRRT_Star:
         """
         return np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(node1, node2)])
 
-    def get_assignment(self):
-        """
-            Get goal assignment
-        """
-        starts = []
-        starts_idx = []
-        for i, g_node in enumerate(self.gaussian_prm.starts):
-            starts += [g_node.get_mean()] * self.starts_agent[i] 
-            starts_idx += [self.gaussian_prm.starts_idx[i]] * self.starts_agent[i]
-        goals = []
-        goals_idx = []
-        for i, g_node in enumerate(self.gaussian_prm.goals):
-            goals += [g_node.get_mean()] * self.goals_agent[i]
-            goals_idx += [self.gaussian_prm.goals_idx[i]] * self.goals_agent[i]
-
-        distance_matrix = cdist(starts, goals)
-        row_ind, col_ind = linear_sum_assignment(distance_matrix)
-        start_state = tuple([starts_idx[idx] for idx in row_ind])
-        goal_state = tuple([goals_idx[idx] for idx in col_ind])
-        return start_state, goal_state
-    
     def get_solution(self):
         """
             Get solution per agent

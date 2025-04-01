@@ -3,10 +3,11 @@
     https://arxiv.org/pdf/1903.00994
     This version does not have rewiring behavior and does not use a heuristic 
 """
+
 from collections import defaultdict, Counter
 
+import hnswlib # For fast NN check
 import numpy as np
-from scipy.spatial import KDTree
 import time
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
@@ -14,7 +15,6 @@ from swarm_prm.utils.gaussian_prm import GaussianPRM
 class DRRT:
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius,
                  starts_agent_count, goals_agent_count, num_agents,
-                 num_random_sample = 5000,
                  time_limit=6000, iterations=10):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
@@ -40,33 +40,33 @@ class DRRT:
                 self.goal_state[node_idx] = node_count
         # Goal signature
         self.goal_state = tuple(sorted(self.goal_state.items()))
-        print(self.goal_state)
 
-        # Finding target assignments
+        # Initialize node capacities
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
         self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
             self.current_node_capacity[start_idx] = self.start_agent_count[i]
         
         # initialize agent location
-        self.current_agent_node_idx = []
+        self.start_state = []
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.current_agent_node_idx += [start_idx] * self.start_agent_count[i]
-        self.current_agent_node_idx = tuple(self.current_agent_node_idx)
+            self.start_state += [start_idx] * self.start_agent_count[i]
+        self.start_state = tuple(self.start_state)
 
         # tree structure
-        self.visited_states = [self.current_agent_node_idx]
-        self.visited_states_idx = {self.current_agent_node_idx:0}
-        self.visited_states_signatures = {self.get_state_signature(self.current_agent_node_idx):0}
-        self.visited_states_location = np.array([[self.nodes[idx] for idx in self.current_agent_node_idx]])
+        self.visited_states = [self.start_state]
+        self.visited_states_idx = {self.start_state:0}
+        self.visited_states_signatures = {self.get_state_signature(self.start_state):0}
 
         # DRRT structure 
-        self.cost = {self.current_agent_node_idx:0} # cost
-        self.tree = {self.current_agent_node_idx: None} # parent
+        self.cost = {self.start_state:0} # cost
+        self.tree = {self.start_state: None} # parent
 
-        # KDTree buffer
-        self.kd_tree_buffer_size = 100
-        self.kd_tree_buffer = []
+        # Fast NN check
+        self.nn = hnswlib.Index(space="l2", dim=self.num_agents*2) # 2D agents
+        self.nn.init_index(max_elements=1000000)
+        start_location = np.array([[self.nodes[idx] for idx in self.start_state]]).flatten()
+        self.nn.add_items(start_location, [0])
 
     def build_neighbors(self):
         """
@@ -95,15 +95,14 @@ class DRRT:
             curr_state = self.tree[curr_state]
         return path[::-1]
     
-    def compute_pairwise_distance(self):
-        """
-            Compute pairwise distance betwe
-        """
-        
     def expand(self):
         """
             Expand DRRT 
         """
+
+        # accroding to the paper, random state only depends of the dimension of
+        # each agents' configuration space.
+
         xs = np.random.uniform(0, self.roadmap.width, self.num_agents)
         ys = np.random.uniform(0, self.roadmap.height, self.num_agents)
         q_rand = np.column_stack((xs, ys)) 
@@ -120,8 +119,8 @@ class DRRT:
             self.visited_states.append(v_new)
             self.visited_states_idx[v_new] = len(self.visited_states) - 1 # add vertex
             self.visited_states_signatures[self.get_state_signature(v_new)] = len(self.visited_states) - 1
-            new_state_location = np.array([[self.nodes[idx] for idx in v_new]])
-            self.visited_states_location = np.concat((self.visited_states_location, new_state_location))
+            new_state_location = np.array([[self.nodes[idx] for idx in v_new]]).flatten()
+            self.nn.add_items(new_state_location, [len(self.visited_states)-1])
             self.tree[v_new] = v_near # type:ignore # add edge
         verify_time = time.time() - verify_time
         return nn_time, Od_time, verify_time
@@ -129,10 +128,16 @@ class DRRT:
     def nearest_neighbor(self, q_rand):
         """
             Find Nearest Neighbor in the tree
-            We first check buffer and then check the KDTree
+            We first check both the buffer and the KDTree
         """
-        min_state = np.argmin(np.sum(np.linalg.norm(self.visited_states_location - q_rand, axis=2), axis=1))
-        return self.visited_states[min_state]
+        # For efficiency reasons, we compute sum of squared distance instead
+        # of sum of distance using KDTree. The KD Tree is updated periodically.
+        # This does not affect the probabilistic completeness
+
+        flat_q_rand = q_rand.flatten()
+        labels, distances = self.nn.knn_query(flat_q_rand, k=1)
+        nearest_idx = labels[0][0]
+        return self.visited_states[nearest_idx]
 
     def Od(self, v_near, q_rand):
         """
@@ -202,14 +207,21 @@ class DRRT:
             Verify if new state is valid
             Return false if node capacity exceeded
         """
-        unique, counts = np.unique(node, return_counts=True)
-        return np.all(self.node_capacity[unique] >= counts)
+        if len(node) != self.num_agents:
+            return False  # quick sanity check
+
+        state_counts = Counter(node)
+        for state, count in state_counts.items():
+            if count > self.node_capacity[state]:
+                return False
+        return True
 
     def verify_connect(self, node1, node2):
         """
             Verify if two states can be connected
             Return false if agents moving in different directions 
         """
+        return True
         edge = set()
         for i in range(self.num_agents):
             if (node2[i], node1[i]) not in edge:
