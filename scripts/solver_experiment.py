@@ -133,7 +133,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--config",
         type=str,
-        required=True,
+        default="config.json",
         help="Path to config JSON file"
     )
 
@@ -143,6 +143,13 @@ if __name__ == "__main__":
         default="results",
         help="Directory for experiment results"
     )
+
+    parser.add_argument(
+        "--show_fig",
+        type=bool,
+        default=False,
+        help="Display Performance Charts"
+    )
     args = parser.parse_args()
 
     ## Copy config file to result folder
@@ -150,6 +157,6 @@ if __name__ == "__main__":
     shutil.copy(args.config, result_path)
     config = load_config(args.config)
     result_path = run_experiment(config, result_path)
-    plot_result(result_path)
+    plot_result(result_path, args.show_fig)
 
     

@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def plot_result(result_fname):
+def plot_result(result_fname, show_fig=False):
 
     # Load and preprocess data
     df = pd.read_csv(result_fname)
@@ -63,4 +63,5 @@ def plot_result(result_fname):
         basename = os.path.dirname(result_fname)
         fig_path = os.path.join(basename, f'{map_type}_performance.png')
         plt.savefig(fig_path, dpi=300, bbox_inches='tight')
-        plt.show()
+        if show_fig:
+            plt.show()
