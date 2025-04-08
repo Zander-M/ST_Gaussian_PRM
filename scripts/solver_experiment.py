@@ -9,14 +9,15 @@ import csv
 import pickle
 import json
 import itertools
-import matplotlib.pyplot as plt
 import shutil
 import time
 
 # Solvers 
-
 from swarm_prm.utils import get_agent_assignment
 from swarm_prm.solvers.macro import SOLVER_REGISTRY
+
+# Scripts
+from plot_result import plot_result
 
 def run_solver(config):
     """
@@ -125,6 +126,7 @@ def run_experiment(config, result_path):
         writer.writeheader()
         writer.writerows(results)
     print(f"Result written to {csv_path}")
+    return csv_path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gaussian PRM makespan experiment.")
@@ -147,6 +149,7 @@ if __name__ == "__main__":
     result_path = create_result_folder(args.output_dir)
     shutil.copy(args.config, result_path)
     config = load_config(args.config)
-    run_experiment(config, result_path)
+    result_path = run_experiment(config, result_path)
+    plot_result(result_path)
 
     
