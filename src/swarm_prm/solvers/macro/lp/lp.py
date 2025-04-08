@@ -7,34 +7,15 @@ import heapq
 import cvxpy as cp
 import numpy as np
 
-class LP:
-    def __init__(self, gaussian_prm, agent_radius,
-                 starts_agent_count, goals_agent_count, num_agents,
-                 time_limit=6000):
-        self.gaussian_prm = gaussian_prm
-        self.nodes = np.array(self.gaussian_prm.samples)
-        self.starts = self.gaussian_prm.starts_idx
-        self.goals = self.gaussian_prm.goals_idx
-        self.num_agents = num_agents
-        self.starts_agent_count = starts_agent_count
-        self.goals_agent_count = goals_agent_count
-        self.agent_radius = agent_radius
-        self.roadmap, self.cost_dict = self.build_roadmap_graph()
-        self.node_capacity = [node.get_capacity(agent_radius) for node in self.gaussian_prm.gaussian_nodes]
+from swarm_prm.solvers.macro import MacroSolverBase, register_solver
 
-    def build_roadmap_graph(self):
+@register_solver("LPSolver")
+class LPSolver(MacroSolverBase):
+    def init_solver(self, **kwargs):
         """
-            Build graph with edge cost
+            No init needed, skip
         """
-        graph = defaultdict(list)
-        cost = defaultdict(defaultdict)
-        for i, edge in enumerate(self.gaussian_prm.roadmap):
-            u, v = edge
-            graph[u].append(v)
-            graph[v].append(u)
-            cost[u][v] = self.gaussian_prm.roadmap_cost[i]
-            cost[v][u] = self.gaussian_prm.roadmap_cost[i]
-        return graph, cost
+        pass
 
     def get_shortest_paths(self):
         """
@@ -82,12 +63,23 @@ class LP:
                     prev[neighbor] = state
                     heapq.heappush(open_list, (curr_cost, neighbor))
         return [], 0
+
+    def get_cost(self, paths):
+        """
+            Get average cost per agent. We use Wasserstein distance between states
+            as an estimator.
+        """
+        cost = 0
+        for path in paths:
+            for u, v in zip(path[:-1], path[1:]):
+                cost += self.cost_dict[u][v]
+        return cost / len(paths)
     
-    def get_solution(self):
+    def solve(self):
         """
             Get solution paths
         """
-        path_idx, path_cost, paths = self.get_shortest_paths()
+        path_idx, path_cost, shortest_paths = self.get_shortest_paths()
 
         # Suppose T = [0, 1, ..., num_trajectories - 1]
         num_trajectories = len(path_idx)
@@ -98,7 +90,7 @@ class LP:
 
         # Build node time to trajectory
         node_time_to_traj = defaultdict(list)
-        for i, path in enumerate(paths):
+        for i, path in enumerate(shortest_paths):
             for t, node in enumerate(path):
                 node_time_to_traj[(node, t)].append(i)
 
@@ -106,19 +98,17 @@ class LP:
 
         # 1. Start location constraints
         for i, start in enumerate(self.starts):
-            start_indices = [j for j, path in enumerate(paths) if path[0] == start]
-            print("starts", start_indices)
+            start_indices = [j for j, path in enumerate(shortest_paths) if path[0] == start]
             constraints.append(cp.sum(x[start_indices]) == self.starts_agent_count[i])
 
         # 2. Goal location constraints
         for i, goal in enumerate(self.goals):
-            goal_indices = [j for j, path in enumerate(paths) if path[-1] == goal]
-            print("goals", goal_indices)
+            goal_indices = [j for j, path in enumerate(shortest_paths) if path[-1] == goal]
             constraints.append(cp.sum(x[goal_indices]) == self.goals_agent_count[i])
 
         # 3. Capacity constraints at intermediate nodes
         for node, cap in enumerate(self.node_capacity):
-            for t in range(len(paths[0])):
+            for t in range(len(shortest_paths[0])):
                 trajs = node_time_to_traj.get((node, t), [])
                 if trajs:
                     constraints.append(cp.sum(x[trajs]) <= cap)
@@ -138,15 +128,21 @@ class LP:
             cp.OPTIMAL, cp.OPTIMAL_INACCURATE,
             cp.USER_LIMIT, cp.SOLVER_ERROR
         ]:
-            print("Best known solution (may be suboptimal):")
-            print("Objective value:", prob.value)
-            print("x =", x.value)
             # Convert solution to paths
-            solutions = []
+            paths = []
             for i, count in enumerate(x.value): # type: ignore
                 for _ in range(int(count)):
-                    solutions.append(paths[i])
-            return solutions, prob.value 
+                    paths.append(shortest_paths[i])
+            cost = self.get_cost(paths)
+
+            return {
+                "success": True,
+                "timestep": max([len(path) for path in paths]),
+                "paths": paths,  
+                "cost": cost,
+                "prob_value": prob.value
+                }
 
         else:
             print("No feasible solution found.")
+            return {"success": False}

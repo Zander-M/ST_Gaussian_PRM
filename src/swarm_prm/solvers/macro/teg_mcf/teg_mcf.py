@@ -5,37 +5,30 @@
 
 from collections import defaultdict, deque
 import time
-from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.teg_mcf import MinCostFlowSolver 
+from swarm_prm.solvers.macro import MacroSolverBase, register_solver
+from swarm_prm.solvers.macro.teg_mcf import MinCostFlow 
+
 
 # distinguish nodes
 
 IN_NODE = 0
 OUT_NODE = 1 
 
-class TEG_MCF:
-    def __init__(self, gaussian_prm:GaussianPRM, num_agents, agent_radius, start_agents, goal_agents, \
-                 flow_constraint, max_time=30) -> None:
-        self.gaussian_prm = gaussian_prm
-        self.agent_radius = agent_radius
-        self.num_agents = num_agents
-        self.start_agents = start_agents # number of agents at each start  
-        self.goal_agents = goal_agents   # number of agents at each goal
-        self.max_time = max_time 
+@register_solver("TEGMCFSolver")
+class TEGMCFSolver(MacroSolverBase):
+    def init_solver(self, **kwargs):
 
-        self.flow_constraint = flow_constraint # treat previous flow as constraints
+        self.flow_constraint = kwargs.get("flow_constraint", []) # treat previous flow as constraints
 
-        self.roadmap, self.cost_dict = self.build_roadmap_graph()
-        self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
         self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
 
         # Verify if instance is feasible
         for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= self.start_agents[i], \
+            assert self.node_capacity[start] >= self.starts_agent_count[i], \
                 "Start capacity smaller than required."
 
         for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= self.goal_agents[i], \
+            assert self.node_capacity[goal] >= self.goals_agent_count[i], \
                 "Goal capacity smaller than required."
 
     def get_min_timestep(self):
@@ -55,26 +48,6 @@ class TEG_MCF:
                     open_list.append((neighbor, time+1))
         return 0
 
-    def build_roadmap_graph(self):
-        """
-            Build graph with edge cost
-        """
-        graph = defaultdict(list)
-        cost = defaultdict(defaultdict)
-
-        for i, edge in enumerate(self.gaussian_prm.roadmap):
-            u, v = edge
-            graph[u].append(v)
-            graph[v].append(u)
-            cost[u][v] = self.gaussian_prm.roadmap_cost[i]
-            cost[v][u] = self.gaussian_prm.roadmap_cost[i]
-
-        # adding wait edges
-        for i in range(len(self.gaussian_prm.samples)):
-            graph[i].append(i) # waiting at node has 0 transport cost
-            cost[i][i] = 0
-        return graph, cost
-
     def build_teg(self, timestep):
         """
             Build TEG based on timestep
@@ -85,11 +58,11 @@ class TEG_MCF:
 
         # Adding super source and super goal to the graph
         for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            teg[super_source][(start_idx, 0, IN_NODE)] = self.start_agents[i] 
+            teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i] 
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goal_agents[i]
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
                     # adding graph edges
         for t in range(timestep):
             for u in self.roadmap:
@@ -127,7 +100,7 @@ class TEG_MCF:
         ### TEG
         # update edges to super sink
         for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
-            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goal_agents[i] 
+            teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i] 
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
         # update edges
@@ -160,7 +133,7 @@ class TEG_MCF:
             residual_graph[(goal_idx, timestep, IN_NODE)][(goal_idx, timestep, OUT_NODE)] = self.node_capacity[goal_idx] - flow
             residual_graph[(goal_idx, timestep, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = flow
 
-            residual_graph[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goal_agents[i] - flow
+            residual_graph[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i] - flow
             residual_graph[super_sink][(goal_idx, timestep, OUT_NODE)] = flow
 
             cost_graph[(goal_idx, timestep, OUT_NODE)][super_sink] = 0
@@ -184,8 +157,8 @@ class TEG_MCF:
         super_source, super_sink, teg = self.build_teg(timestep)
         residual_graph, cost_graph = self.build_residual_graph_cost_graph(teg)
 
-        while time.time() - start_time < self.max_time:
-            max_flow, residual_graph, cost = MinCostFlowSolver(super_source, super_sink, 
+        while time.time() - start_time < self.time_limit:
+            max_flow, residual_graph, cost = MinCostFlow(super_source, super_sink, 
                                     residual_graph, cost_graph, self.flow_constraint, 
                                     initial_flow=max_flow, initial_cost=cost).solve()
             if timestep % 100 == 0:

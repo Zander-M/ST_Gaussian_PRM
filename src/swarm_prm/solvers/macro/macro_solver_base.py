@@ -1,0 +1,77 @@
+"""
+    Base Class for macro solver
+"""
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from typing import Dict, Any
+
+import numpy as np
+
+from swarm_prm.utils import GaussianPRM
+
+class MacroSolverBase(ABC):
+    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
+                 num_agents, starts_agent_count, goals_agent_count, 
+                 time_limit=100, **kwargs) -> None:
+        self.gaussian_prm = gaussian_prm
+        self.map = self.gaussian_prm.raw_map # Map geometry
+        self.num_agents = num_agents
+
+        self.starts = self.gaussian_prm.starts_idx
+        self.goals = self.gaussian_prm.goals_idx
+        self.starts_agent_count = starts_agent_count
+        self.goals_agent_count = goals_agent_count
+        self.time_limit = time_limit
+
+        self.roadmap, self.cost_dict = self.build_roadmap_with_cost()
+        self.nodes = np.array(self.gaussian_prm.samples)
+        self.node_capacity = [node.get_capacity(agent_radius) for node in self.gaussian_prm.gaussian_nodes]
+
+        # Verify if instance is feasible
+        for i, start in enumerate(self.gaussian_prm.starts_idx):
+            assert self.node_capacity[start] >= self.starts_agent_count[i],\
+                "Start capacity smaller than required."
+
+        for i, goal in enumerate(self.gaussian_prm.goals_idx):
+            assert self.node_capacity[goal] >= self.goals_agent_count[i], \
+                "Goal capacity smaller than required."
+        self.init_solver(**kwargs)
+    
+    def build_roadmap_with_cost(self):
+        """
+            Build roadmap that includes self loops for wait actions.
+            Return roadmap and the cost map
+        """
+        graph = defaultdict(list)
+        cost = defaultdict(defaultdict)
+
+        for i, edge in enumerate(self.gaussian_prm.roadmap):
+            u, v = edge
+            graph[u].append(v)
+            graph[v].append(u)
+            cost[u][v] = self.gaussian_prm.roadmap_cost[i]
+            cost[v][u] = self.gaussian_prm.roadmap_cost[i]
+
+        # adding wait edges
+        for i in range(len(self.gaussian_prm.samples)):
+            graph[i].append(i) # waiting at node has 0 transport cost
+            cost[i][i] = 0
+        return graph, cost
+
+    @abstractmethod
+    def init_solver(self, **kwargs):
+        """
+            Initialize solver using solver specific kwargs
+        """
+        pass
+        
+    @abstractmethod
+    def solve(self)->Dict[str, Any]:
+        """
+            Solving planning problem
+        """
+        return {
+            "success": False,
+            "timestep": 0, 
+            "cost": 0
+            }

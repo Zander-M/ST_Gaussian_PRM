@@ -1,2 +1,2 @@
-from .max_flow import *
-from .teg import *
+from .max_flow import MaxFlow
+from .teg import TEGSolver

@@ -1,1 +1,1 @@
-from .lp import *
+from .lp import LPSolver

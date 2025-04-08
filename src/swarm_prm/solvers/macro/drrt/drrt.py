@@ -3,60 +3,44 @@
     https://arxiv.org/pdf/1903.00994
     This version does not have rewiring behavior and does not use a heuristic 
 """
+import time
+from collections import Counter
 
-from collections import defaultdict, Counter
-
+from scipy.spatial.distance import cdist 
+from scipy.optimize import linear_sum_assignment
 import hnswlib # For fast NN check
 import numpy as np
-import time
 
-from swarm_prm.utils.gaussian_prm import GaussianPRM
+from swarm_prm.solvers.macro import MacroSolverBase, register_solver
 
-class DRRT:
-    def __init__(self, gaussian_prm:GaussianPRM, agent_radius,
-                 starts_agent_count, goals_agent_count, num_agents,
-                 time_limit=6000, iterations=10):
+@register_solver("DRRTSolver")
+class DRRTSolver(MacroSolverBase):
+    def init_solver(self, **kwargs):
         """
             We use the same roadmap for multiple agents. If a Gaussian node
             does not exceed its capacity, we do not consider it a collision.
 
             State is represented as a list of agent node indices.
         """
-        self.gaussian_prm = gaussian_prm
-        self.nodes = np.array(self.gaussian_prm.samples)
-        self.num_agents = num_agents
-        self.roadmap = self.gaussian_prm.raw_map
-        self.roadmap_neighbors = self.build_neighbors()
-        self.time_limit = time_limit
-        self.iterations = iterations
-        self.agent_radius = agent_radius
 
-        # Initialize problem instance
-        self.start_agent_count = starts_agent_count
-        self.goal_agent_count = goals_agent_count
-        self.goal_state = {}
-        for node_idx, node_count in zip(self.gaussian_prm.goals_idx, self.goal_agent_count):
-            if node_count > 0:
-                self.goal_state[node_idx] = node_count
-        # Goal signature
-        self.goal_state = tuple(sorted(self.goal_state.items()))
+        self.iterations = kwargs.get("iterations", 1) # iterations per goal state check
 
-        # Initialize node capacities
-        self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
-        self.current_node_capacity = [0 for _ in range(len(self.gaussian_prm.samples))]
-        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.current_node_capacity[start_idx] = self.start_agent_count[i]
-        
+        # Define goal state
+        starts_loc = [self.nodes[idx] for idx in self.starts]
+        goals_loc = [self.nodes[idx] for idx in self.goals]
+        dists = cdist(starts_loc, goals_loc)
+        _, self.goal_state= linear_sum_assignment(dists)
+        self.goal_state = tuple(self.goal_state)
+
         # initialize agent location
         self.start_state = []
-        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.start_state += [start_idx] * self.start_agent_count[i]
+        for i, start_idx in enumerate(self.starts):
+            self.start_state += [start_idx] * self.starts_agent_count[i]
         self.start_state = tuple(self.start_state)
 
         # tree structure
         self.visited_states = [self.start_state]
         self.visited_states_idx = {self.start_state:0}
-        self.visited_states_signatures = {self.get_state_signature(self.start_state):0}
 
         # DRRT structure 
         self.cost = {self.start_state:0} # cost
@@ -67,22 +51,6 @@ class DRRT:
         self.nn.init_index(max_elements=1000000)
         start_location = np.array([[self.nodes[idx] for idx in self.start_state]]).flatten()
         self.nn.add_items(start_location, [0])
-
-    def build_neighbors(self):
-        """
-            Get neighbor states
-        """
-        graph = defaultdict(list)
-
-        for i, edge in enumerate(self.gaussian_prm.roadmap):
-            u, v = edge
-            graph[u].append((v, self.gaussian_prm.roadmap_cost[i]))
-            graph[v].append((u, self.gaussian_prm.roadmap_cost[i]))
-        
-        for v in range(len(self.nodes)):
-            graph[v].append((v, 0)) # add wait edges
-
-        return graph
 
     def connect_to_target(self, goal_state):
         """
@@ -103,8 +71,8 @@ class DRRT:
         # accroding to the paper, random state only depends of the dimension of
         # each agents' configuration space.
 
-        xs = np.random.uniform(0, self.roadmap.width, self.num_agents)
-        ys = np.random.uniform(0, self.roadmap.height, self.num_agents)
+        xs = np.random.uniform(0, self.map.width, self.num_agents)
+        ys = np.random.uniform(0, self.map.height, self.num_agents)
         q_rand = np.column_stack((xs, ys)) 
         nn_time = time.time()
         v_near = self.nearest_neighbor(q_rand)
@@ -118,7 +86,6 @@ class DRRT:
             and self.verify_connect(v_near, v_new):
             self.visited_states.append(v_new)
             self.visited_states_idx[v_new] = len(self.visited_states) - 1 # add vertex
-            self.visited_states_signatures[self.get_state_signature(v_new)] = len(self.visited_states) - 1
             new_state_location = np.array([[self.nodes[idx] for idx in v_new]]).flatten()
             self.nn.add_items(new_state_location, [len(self.visited_states)-1])
             self.tree[v_new] = v_near # type:ignore # add edge
@@ -153,8 +120,8 @@ class DRRT:
             diff = q_rand[agent] - current_pos  
             norm_diff = np.linalg.norm(diff)
             random_dir_vec = np.divide(diff, norm_diff, out=np.zeros_like(diff), where=(norm_diff != 0))
-            neighbors = self.roadmap_neighbors[v_near[agent]]
-            neighbor_ids = [neighbor[0] for neighbor in neighbors]
+            neighbors = self.roadmap[v_near[agent]]
+            neighbor_ids = [neighbor for neighbor in neighbors]
             neighbor_vecs = self.nodes[neighbor_ids] - current_pos
             norms = np.linalg.norm(neighbor_vecs, axis=1, keepdims=True)
             neighbor_unit_vecs = neighbor_vecs / np.where(norms == 0, 1, norms)
@@ -163,15 +130,7 @@ class DRRT:
             next_state.append(next_idx)
         return tuple(next_state)
     
-    def get_state_signature(self, state):
-        """
-            Get state signature for goal state check
-        """
-        signature = Counter(state)
-        hashable_signature = tuple(sorted(signature.items()))
-        return hashable_signature
-
-    def get_solution(self):
+    def solve(self):
         """
             Get solution per agent
         """
@@ -188,10 +147,15 @@ class DRRT:
                 nn_time += nn_t
                 Od_time += Od_t
                 verify_time += v_t
-            if self.goal_state in self.visited_states_signatures:
-                path = self.connect_to_target(self.visited_states[self.visited_states_signatures[self.goal_state]])
+            if self.goal_state in self.visited_states:
+                path = self.connect_to_target(self.goal_state)
                 print("Found solution")
-                return path, self.cost
+                return {
+                    "success": True,
+                    "path": path,
+                    "timestep": len(path),
+                    "cost": self.cost
+                }
             if iteration % 1000 == 0:
                 print("Iteration:", iteration)
                 print("nearest neighbor time: ", nn_time)
@@ -199,7 +163,9 @@ class DRRT:
                 print("Verify time: ", verify_time)
         print("exceeded run time")
         print(self.visited_states)
-        return None, None
+        return {
+            "success": False
+        }
 
     #   Connection verification
     def verify_node(self, node):

@@ -5,7 +5,7 @@
 from collections import defaultdict
 import heapq
 
-class MinCostFlowSolver:
+class MinCostFlow:
     """
         Min Cost Flow Solver that can reuse residual graphs.
     """

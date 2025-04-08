@@ -4,7 +4,7 @@
 
 from collections import deque
 
-class MaxFlowSolver:
+class MaxFlow:
     """
         Max Flow Solver that can reuse residual graphs.
     """

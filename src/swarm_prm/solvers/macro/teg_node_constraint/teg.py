@@ -6,8 +6,9 @@
 import time
 
 from collections import defaultdict, deque
-from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.solvers.macro.teg.max_flow import MaxFlowSolver
+from swarm_prm.utils import GaussianPRM
+from swarm_prm.solvers.macro import MacroSolverBase, register_solver
+from swarm_prm.solvers.macro.teg_node_constraint.max_flow import MaxFlow
 
 # distinguish nodes
 
@@ -17,7 +18,8 @@ OUT_NODE = 1
 def dd():
     return defaultdict()
 
-class TEG_Node_Constraint:
+@register_solver("TEGNodeConstraintSolver")
+class TEGNodeConstraintSolver(MacroSolverBase):
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
                  num_agents, starts_agent_count, goals_agent_count, 
                  flow_dicts=[], 
@@ -37,23 +39,6 @@ class TEG_Node_Constraint:
         self.capacity_dicts = capacity_dicts
         self.max_timestep = max_timestep   # current solution time
 
-        # Search Constraints
-        self.time_limit = time_limit 
-
-        # Initialization
-        self.roadmap_graph = self.build_roadmap_graph()
-        self.nodes = [i for i in range(len(self.gaussian_prm.samples))]
-        self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
-
-        # Verify if instance is feasible
-        for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= self.starts_agent_count[i],\
-                "Start capacity smaller than required."
-
-        for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= self.goals_agent_count[i], \
-                "Goal capacity smaller than required."
-
     def get_min_timestep(self):
         """
             Find the ealiest timestep for any agent to reach any goal using bfs
@@ -66,27 +51,12 @@ class TEG_Node_Constraint:
             if curr_node in goals:
                 return time
             visited.add(curr_node)
-            for neighbor in self.roadmap_graph[curr_node]:
+            for neighbor in self.roadmap[curr_node]:
                 if neighbor not in visited:
                     open_list.append((neighbor, time+1))
         return 0
 
-    def build_roadmap_graph(self):
-        """
-            Find the earliest timestep that reaches the max flow
-        """
-        graph = defaultdict(list)
 
-        for edge in self.gaussian_prm.roadmap:
-            u, v = edge
-            graph[u].append(v)
-            graph[v].append(u)
-
-        # adding wait edges
-        for i in range(len(self.gaussian_prm.samples)):
-            graph[i].append(i)
-
-        return graph
 
     def build_teg(self, timestep):
         """
@@ -106,7 +76,7 @@ class TEG_Node_Constraint:
 
         # adding graph edges
         for t in range(timestep):
-            for u in self.roadmap_graph:
+            for u in self.roadmap:
 
                 # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
                 teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]  
@@ -116,7 +86,7 @@ class TEG_Node_Constraint:
                         break
 
                 # Edge between states
-                for v in self.roadmap_graph[u]:
+                for v in self.roadmap[u]:
                     # check if inverse edge between different nodes exists. Edge Constraint
                     if (u != v):
                         edge_exists = False
@@ -154,16 +124,16 @@ class TEG_Node_Constraint:
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
         # update edges
-        for u in self.roadmap_graph:
-            for v in self.roadmap_graph[u]:
+        for u in self.roadmap:
+            for v in self.roadmap[u]:
                 teg[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
                 teg[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = \
                     self.node_capacity[v]
     
         ### Residual Dict
         # update edges
-        for u in self.roadmap_graph:
-            for v in self.roadmap_graph[u]:
+        for u in self.roadmap:
+            for v in self.roadmap[u]:
                 residual_dict[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
                 residual_dict[(v, timestep, IN_NODE)][(u, timestep-1, OUT_NODE)] = 0 
                 residual_dict[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = self.node_capacity[v]
@@ -198,7 +168,7 @@ class TEG_Node_Constraint:
 
         start_time = time.time()
         while time.time() - start_time < self.time_limit:
-            max_flow, residual_graph = MaxFlowSolver(teg, super_source, super_sink, 
+            max_flow, residual_graph = MaxFlow(teg, super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
             # print("Time step: ", timestep, "Max Flow: ", max_flow) # TESTT
 
