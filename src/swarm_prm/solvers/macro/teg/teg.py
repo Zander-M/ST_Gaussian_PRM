@@ -21,9 +21,9 @@ def dd():
 class TEGSolver(MacroSolverBase):
     def init_solver(self, **kwargs) -> None:
         # Flow constraints
-        self.flow_dicts = kwargs.get("flow_dicts", []) # existing flow on graph
+        self.flow_dicts = kwargs.get("flow_dicts", [])
         self.capacity_dicts = kwargs.get("capacity_dicts", [])
-        self.max_timestep = kwargs.get("max_timestep", 0)   # current solution time
+        self.max_timestep = kwargs.get("max_timestep", 0)
 
     def get_min_timestep(self):
         """

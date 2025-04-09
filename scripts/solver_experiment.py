@@ -43,7 +43,6 @@ def run_solver(config):
             "solution_timestep": solution["timestep"],
             "solution_cost": solution["cost"]
         }
-
     else:
         return {
             "success": False
@@ -56,8 +55,8 @@ def load_config(config_path):
     config = {}
     with open(config_path, "r") as f:
        config = json.load(f)
-
-
+    import pprint
+    pprint.pprint(config)
     return config
     
 def create_result_folder(output_dir):
@@ -99,6 +98,7 @@ def run_experiment(config, result_path):
             "time_limit": config["time_limit"]
         }
 
+        experiment_config.update(config["solver_config"][solver])
         print(f"Running {solver}, Agents: {num_agents}, Map: {map_type}, Samples: {num_samples}")
 
         # Load Map
@@ -106,7 +106,6 @@ def run_experiment(config, result_path):
         fname = os.path.join("../maps", map_fname)
         with open(fname, "rb") as f:
             experiment_config["gaussian_prm"] = pickle.load(f) 
-
         result = run_solver(experiment_config)
 
         # Add experiment config

@@ -13,9 +13,9 @@ from swarm_prm.solvers.macro import MacroSolverBase, register_solver
 class LPSolver(MacroSolverBase):
     def init_solver(self, **kwargs):
         """
-            No init needed, skip
+            Solver Init
         """
-        pass
+        self.capacity_constraint = kwargs.get("capacity_constraint", True)
 
     def get_shortest_paths(self):
         """
@@ -107,11 +107,12 @@ class LPSolver(MacroSolverBase):
             constraints.append(cp.sum(x[goal_indices]) == self.goals_agent_count[i])
 
         # 3. Capacity constraints at intermediate nodes
-        for node, cap in enumerate(self.node_capacity):
-            for t in range(len(shortest_paths[0])):
-                trajs = node_time_to_traj.get((node, t), [])
-                if trajs:
-                    constraints.append(cp.sum(x[trajs]) <= cap)
+        if self.capacity_constraint:
+            for node, cap in enumerate(self.node_capacity):
+                for t in range(len(shortest_paths[0])):
+                    trajs = node_time_to_traj.get((node, t), [])
+                    if trajs:
+                        constraints.append(cp.sum(x[trajs]) <= cap)
 
         # 4. Optional: x >= 0
         constraints.append(x >= 0)
