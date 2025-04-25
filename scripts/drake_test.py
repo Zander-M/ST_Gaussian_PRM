@@ -39,29 +39,31 @@ def chebyshev_center(A, b):
     prob.solve()
     return x.value
 
-def iris_hpoly_to_polygon(A, b, eps=1e-8):
+def iris_hpoly_to_polygon(hpoly: HPolyhedron) -> Polygon:
     """
-    Convert HPolyhedron (Ax <= b) to a shapely Polygon using scipy.
-    Uses Chebyshev center and small shrink to ensure strict feasibility.
+    Converts a 2D Drake HPolyhedron (Ax <= b) into a shapely Polygon using scipy.
     """
-    def chebyshev_center(A, b):
-        from cvxpy import Variable, norm, Problem, Maximize
-        x = Variable(A.shape[1])
-        r = Variable()
-        constraints = [A @ x + norm(A[i], 2) * r <= b[i] for i in range(A.shape[0])]
-        prob = Problem(Maximize(r), constraints)
-        prob.solve()
-        return x.value
+    A = hpoly.A()
+    b = hpoly.b()
+    assert A.shape[1] == 2, "Only supports 2D HPolyhedra for now"
 
-    # Slight inward offset to ensure numerical feasibility
-    interior_point = chebyshev_center(A, b)
-    b_shrunk = b - eps
-    halfspaces = np.hstack([-A, b_shrunk.reshape(-1, 1)])
+    center = hpoly.ChebyshevCenter()
 
-    from scipy.spatial import HalfspaceIntersection, ConvexHull
-    hs = HalfspaceIntersection(halfspaces, interior_point=interior_point)
-    hull = ConvexHull(hs.intersections)
-    return Polygon(hs.intersections[hull.vertices])
+    if center is None:
+        raise RuntimeError("Failed to compute Chebyshev center.")
+
+    # Flatten interior point to shape (2,) for scipy
+    interior_point = np.array(center[0]).flatten()
+
+    # Convert Ax <= b to scipy format: [a1, a2, -b]
+    halfspaces = np.hstack([A, -b.reshape(-1, 1)])
+
+    # Compute intersections
+    hs = HalfspaceIntersection(halfspaces, interior_point=center)
+
+    # Return a convex shapely polygon
+    return Polygon(hs.intersections).convex_hull
+
 
 def run_iris_with_shapely(seed_point, obstacles, bounds=[[-100, 100], [-100, 100]]):
     """
@@ -92,7 +94,7 @@ def run_iris_with_shapely(seed_point, obstacles, bounds=[[-100, 100], [-100, 100
         options=options
     )
 
-    return iris_hpoly_to_polygon(region.A(), region.b())
+    return iris_hpoly_to_polygon(region)
 
 
 def plot_region_and_obstacles(region_poly, obstacles, seed=None):
@@ -116,9 +118,9 @@ def plot_region_and_obstacles(region_poly, obstacles, seed=None):
 # === Example usage ===
 if __name__ == "__main__":
     obstacles = [
-        box(-2, -1.5, -0.5, -0.2),  # A box-shaped obstacle
-        # Polygon([(1.5, 0.5), (2.5, 0.5), (2, 1.8)]),  # A triangle
+        box(24, 24, 50, 50),  # A box-shaped obstacle
+        Polygon([(-10, -10), (-4, -20), (-30, -40)]),  # A triangle
     ]
-    seed = [0.4, 0.5]
+    seed = [2, 2]
     iris_poly = run_iris_with_shapely(seed, obstacles)
     plot_region_and_obstacles(iris_poly, obstacles, seed)
