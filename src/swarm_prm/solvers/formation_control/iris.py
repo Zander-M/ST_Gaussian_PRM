@@ -1,3 +1,8 @@
+"""
+    IRIS util.
+    Given a Gaussian PRM and a random sample, return a convex shapely geometry
+    as the candidate next state
+"""
 import numpy as np
 import cvxpy as cp
 import matplotlib.pyplot as plt
@@ -164,8 +169,9 @@ def plot_region_and_obstacles(region_poly, obstacles, seed=None):
 if __name__ == "__main__":
     obstacles = [
         box(24, 24, 50, 50),  # A box-shaped obstacle
-        Polygon([(-60, -60), (-80, -40), (-70, -45)]),
+        Polygon([(0, -10), (-10, 0), (-20, -25)]),
     ]
     seed = [2, 2]
     iris_poly = run_iris_with_shapely(seed, obstacles)
     plot_region_and_obstacles(iris_poly, obstacles, seed)
+
