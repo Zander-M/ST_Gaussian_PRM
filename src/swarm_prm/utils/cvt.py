@@ -225,7 +225,6 @@ def plot_voronoi(voronoi, bounding_polygon, obstacles):
             plt.fill(x, y, alpha=0.4, edgecolor='k')
             center, A_matrix = johns_ellipsoid_edge_constraints(orient(cell_polygon)) # FIXIT
             plot_ellipsoid(ax, center, A_matrix)
-            
 
     # Plot Voronoi sites
     # plt.plot(voronoi.points[:, 0], voronoi.points[:, 1], 'ro')

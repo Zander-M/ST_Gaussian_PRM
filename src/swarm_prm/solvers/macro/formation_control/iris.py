@@ -20,11 +20,11 @@ from pydrake.all import (
     VPolytope,
     IrisOptions,
 )
-from pydrake.geometry.optimization import Iris
+from pydrake.geometry.optimization import Iris # type:ignore
 
 class IrisSampler:
     def __init__(self, gaussian_prm):
-        self.obstacles = gaussian_prm.raw_map.obstacles
+        self.obstacles = [obs.geom for obs in gaussian_prm.raw_map.obstacles]
         self.width = gaussian_prm.raw_map.width
         self.height = gaussian_prm.raw_map.height
 
@@ -71,7 +71,7 @@ class IrisSampler:
         """
         A = hpoly.A()
         b = hpoly.b()
-        assert A.shape[1] == 2, "Only supports 2D HPolyhedra for now"
+        assert A.shape[1] == 2, "Only supports 2D HPolyhedra for now" #type: ignore
 
         center = hpoly.ChebyshevCenter()
 

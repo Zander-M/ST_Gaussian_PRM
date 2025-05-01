@@ -16,6 +16,7 @@ class MacroSolverBase(ABC):
         self.gaussian_prm = gaussian_prm
         self.map = self.gaussian_prm.raw_map # Map geometry
         self.num_agents = num_agents
+        self.agent_radius = agent_radius
 
         self.starts = self.gaussian_prm.starts_idx
         self.goals = self.gaussian_prm.goals_idx
