@@ -86,6 +86,7 @@ class FormationControlSovler(MacroSolverBase):
                             "success": True,
                             "g_nodes": g_nodes,
                             "paths" : paths,
+                            "timestep": len(paths[0]),
                             "starts_idx": starts_idx,
                             "goals_idx": goals_idx,
                             "start_poly": start_poly,

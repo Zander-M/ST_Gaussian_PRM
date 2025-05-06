@@ -14,9 +14,6 @@ from swarm_prm.solvers.macro.teg import MaxFlow
 IN_NODE = 0
 OUT_NODE = 1 
 
-def dd():
-    return defaultdict()
-
 @register_solver("TEGSolver")
 class TEGSolver(MacroSolverBase):
     def init_solver(self, **kwargs) -> None:
@@ -203,6 +200,9 @@ class TEGSolver(MacroSolverBase):
                 cost = self.get_cost(paths)
                 return {
                     "timestep": timestep, 
+                    "g_nodes": self.gaussian_prm.gaussian_nodes,
+                    "starts_idx": self.gaussian_prm.starts_idx,
+                    "goals_idx": self.gaussian_prm.goals_idx,
                     "paths": paths,
                     "cost" : cost,
                     "flow_dict": flow_dict, 

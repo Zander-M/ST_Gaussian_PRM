@@ -190,12 +190,11 @@ class EvaluationSolver:
                     self.agent_locations[agent_idx] = next_node
                     solution[agent_idx].append(next_node)
 
-        # TODO: evaluate solution length
+        # adding cost (sum of longest transitions within each timesteps)
         path_costs = []
         for path in solution:
             path_costs.append([np.linalg.norm(next_node-prev_node) for prev_node, next_node in zip(path[:-1], path[1:])])
         path_costs = np.array(path_costs)
-        cost = np.sum(np.max(path_costs, axis=1))
-
+        cost = np.sum(np.max(path_costs, axis=0))
         return solution, cost
     
