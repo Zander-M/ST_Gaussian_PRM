@@ -376,6 +376,38 @@ class GaussianPRM:
 
 # Visualization functions
 
+    def visualize_map(self):
+        """
+            Visualize map only
+        """
+        fig, ax = plt.subplots(figsize=(10, 10))
+        for start in self.instance.starts:
+            pos = start.get_mean()
+            ax.plot(pos[0], pos[1], 'bo', markersize=3)
+            start.visualize_gaussian(ax=ax, cmap="Reds")
+            # start.visualize(ax=ax, edgecolor="blue")
+
+        for goal in self.instance.goals:
+            pos = goal.get_mean()
+            ax.plot(pos[0], pos[1], 'go', markersize=3)
+            goal.visualize_gaussian(ax=ax, cmap="Blues")
+            # goal.visualize(ax=ax, edgecolor="green")
+
+        for obs in self.raw_map.obstacles:
+            if obs.obs_type == "CIRCLE": 
+                x, y = obs.get_pos()
+                # ax.plot(x, y, 'ro', markersize=3)
+                ax.add_patch(Circle((x, y), radius=obs.radius, color="black"))
+            elif obs.obs_type == "POLYGON":
+                x, y = obs.geom.exterior.xy
+                ax.fill(x, y, fc="black")
+
+        ax.set_aspect('equal')
+        ax.set_xlim(left=0, right=self.raw_map.width)
+        ax.set_ylim(bottom=0, top=self.raw_map.height)
+        return fig, ax
+
+
     def visualize_solution(self, flow_dict, timestep, num_agent):
         """
             Visualize solution path per timestep provided the flow dict
