@@ -17,6 +17,8 @@ from swarm_prm.envs.instance import Instance
 
 MAP_PATH = "../maps"
 
+plt.ioff()
+
 # Curated Test Examples
 maps = {
         "empty":{
@@ -30,6 +32,15 @@ maps = {
                 "obstacles" : [
                                 Obstacle(None, "POLYGON", [(30, 0), (30, 40), (70, 40), (70, 0)]),
                                 Obstacle(None, "POLYGON", [(30, 100), (30, 60), (70, 60), (70, 100)])
+                            ], 
+                "starts" : np.array([[10, 10], [10, 90]]), 
+                "goals" : np.array([[90, 90], [90, 10]])             
+                },
+        "corridor_narrow":{
+                "roadmap" : Roadmap(100, 100), 
+                "obstacles" : [
+                                Obstacle(None, "POLYGON", [(30, 0), (30, 45), (70, 45), (70, 0)]),
+                                Obstacle(None, "POLYGON", [(30, 100), (30, 55), (70, 55), (70, 100)])
                             ], 
                 "starts" : np.array([[10, 10], [10, 90]]), 
                 "goals" : np.array([[90, 90], [90, 10]])             
@@ -79,7 +90,7 @@ if __name__ == "__main__":
     
     parser.add_argument(
         "--map_type",
-        choices=["empty", "corridor", "obstacle", "cross", "corridor_exchange"],
+        choices=["empty", "corridor", "obstacle", "cross", "corridor_exchange", "corridor_narrow"],
         nargs="+",
         default="empty",
         help="Type of the map to generate."
