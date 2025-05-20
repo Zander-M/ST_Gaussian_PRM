@@ -22,6 +22,7 @@ class GaussianPRM:
 
     def __init__(self, instance, num_samples, 
                  alpha=0.95, cvar_threshold=-8,
+                 confidence_interval=0.95,
                  mc_threshold=0.02,
                  safety_radius=2.0,
                  swarm_prm_covariance_scaling=5,
@@ -39,6 +40,7 @@ class GaussianPRM:
         self.alpha = alpha
         self.cvar_threshold = cvar_threshold
         self.safety_radius = safety_radius
+        self.confidence_interval = confidence_interval
 
         # Monte Carlo Sampling strategy
         self.mc_threshold = mc_threshold
@@ -121,7 +123,7 @@ class GaussianPRM:
                 Perform Centroidal Voronoi Tesellation for choosing 
                 Gaussian Points
             """
-            cvt_instance = CVT(self.raw_map, self.num_samples, iteration=500)
+            cvt_instance = CVT(self.raw_map, self.num_samples, iteration=500, confidence_interval=self.confidence_interval)
             samples, gaussian_nodes = cvt_instance.get_CVT()
             self.samples.extend(samples)
             self.gaussian_nodes.extend(gaussian_nodes)

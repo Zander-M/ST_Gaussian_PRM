@@ -158,6 +158,8 @@ class GaussianGraphNode(GaussianNode):
             eigenvectors = eigenvectors[:, order]
             chi2_value = chi2.ppf(self.alpha, 2) 
             width, height = 2 * np.sqrt(chi2_value * eigenvalues)
+
+            # apply a small threshold to guarantee feasibility
             return floor(width * height / (agent_radius * agent_radius)*threshold)
 
     def get_mean(self):

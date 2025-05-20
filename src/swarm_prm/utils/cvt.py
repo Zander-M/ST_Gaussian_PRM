@@ -115,8 +115,6 @@ class CVT:
         
         return samples, g_nodes
 
-                
-    
 # Polygon -> Gaussian Functions
 
 def get_polygon_inequalities(polygon: Polygon):

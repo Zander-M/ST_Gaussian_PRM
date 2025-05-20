@@ -2,7 +2,6 @@
     Spatial Hash for quick neighbour lookup
 """
 from collections import defaultdict
-
 import numpy as np
 
 class SpatialHash:
@@ -22,6 +21,17 @@ class SpatialHash:
         cell_x = np.floor(position[0] / self.grid_size)
         cell_y = np.floor(position[1] / self.grid_size)
         return (cell_x, cell_y)
+
+    def build(self, pos_array):
+        """
+            Rebuild the hash table from a (N, 2) array of agent positions.
+        """
+        self.hash_table.clear()
+        self.agent_positions.clear()
+        for agent_id, position in enumerate(pos_array):
+            cell = self._hash(position)
+            self.hash_table[cell].append((agent_id, position))
+            self.agent_positions[agent_id] = position
 
     def insert(self, agent_id, position):
         """
@@ -48,18 +58,15 @@ class SpatialHash:
             Update agent position
         """
         old_position = self.agent_positions.get(agent_id)
-        if old_position is None:
-            self.insert(agent_id, new_position)
-            return
+        if old_position is not None:
+            old_cell = self._hash(old_position)
+            self.hash_table[old_cell] = [
+                (id, pos) for id, pos in self.hash_table[old_cell] if id != agent_id
+            ]
+            new_cell = self._hash(new_position)
+            self.hash_table[new_cell].append((agent_id, new_position))
+            self.agent_positions[agent_id] = new_position
 
-        old_cell = self._hash(old_position)
-        new_cell = self._hash(new_position)
-
-        if old_cell != new_cell:
-            self.remove(agent_id, old_cell)
-            self.insert(agent_id, new_cell)
-        
-        self.agent_positions[agent_id] = new_position
 
     def query_radius(self, position, radius):
         """

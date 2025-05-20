@@ -11,12 +11,12 @@ from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 from scipy.stats import chi2
 
-def sample_gaussian(g_node, num_points, ci, min_spacing, candidates=None):
+def sample_gaussian(g_node, num_points, confidence_interval, min_spacing, candidates=None):
 
     """
         Return Gaussian Samples within the confidence interval
     """
-    chi2_thresh = chi2.ppf(ci, 2)
+    chi2_thresh = chi2.ppf(confidence_interval, 2)
     mean, cov = g_node.get_gaussian()
 
     if candidates is None:
@@ -43,10 +43,10 @@ def sample_gaussian(g_node, num_points, ci, min_spacing, candidates=None):
 
 class EvaluationSolver:
 
-    def __init__(self, gaussian_nodes, macro_solution, timestep,
+    def __init__(self, gaussian_nodes, macro_solution, agent_radius, timestep,
                      num_agents, starts_idx, goals_idx, 
                      starts_agent_count, goals_agent_count,
-                     safety_gap = 0.2, ci=0.8,
+                     confidence_interval=0.95,
                     interpolation_count=10
                  ):
         self.gaussian_nodes = gaussian_nodes 
@@ -60,8 +60,8 @@ class EvaluationSolver:
         self.interpolation_count = interpolation_count
 
         # Gaussian Sampling Parameters
-        self.safety_gap = safety_gap
-        self.ci = ci # Confidence Interval
+        self.safety_gap = 2*agent_radius
+        self.confidence_interval = confidence_interval # Confidence Interval
 
         # precompute Gaussian Candidates
         self.gaussian_candidates = []
@@ -102,7 +102,7 @@ class EvaluationSolver:
 
         """
         g_node = self.gaussian_nodes[node_idx]
-        return sample_gaussian(g_node, num_samples, self.ci, self.safety_gap, self.gaussian_candidates[node_idx])
+        return sample_gaussian(g_node, num_samples, self.confidence_interval, self.safety_gap, self.gaussian_candidates[node_idx])
 
     def update_agent_locations(self, agents_idx, gaussains_samples):
         """
@@ -182,13 +182,16 @@ class EvaluationSolver:
                 next_node_agents.append((node, incoming_agents))
 
             # update next node agents location
-            for node_idx, node_agent in next_node_agents:
-                self.node_agents[node_idx] = node_agent
+            new_node_agents = defaultdict(list)
+            for node_idx, agents in next_node_agents:
+                new_node_agents[node_idx].extend(agents)
+            self.node_agents = new_node_agents
 
             for trajectory in trajectories:
                 for agent_idx, next_node in trajectory.items():
                     self.agent_locations[agent_idx] = next_node
                     solution[agent_idx].append(next_node)
+        solution = np.array(solution) # convert to np array
 
         # adding cost (sum of longest transitions within each timesteps)
         path_costs = []
