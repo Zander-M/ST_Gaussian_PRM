@@ -46,7 +46,7 @@ class CVT:
             cell_polygon = Polygon(region_vertices)
 
             # If the region intersects with any obstacle, keep the original point
-            if self.roadmap.is_sampling_geometry_collision(cell_polygon):
+            if self.roadmap.is_geometry_collision(cell_polygon):
                 new_points.append(point)
             else:
                 # Calculate the centroid of the cell
@@ -78,12 +78,12 @@ class CVT:
         points = []
         while len(points) < self.num_samples:
             point = (np.random.rand()*width, np.random.rand()*height)
-            while self.roadmap.is_sampling_point_collision(point):
+            while self.roadmap.is_point_collision(point):
                 point = (np.random.rand()*width, np.random.rand()*height)
             points.append(point)
         points = np.array(points)
 
-        obstacles = self.roadmap.obstacles + self.roadmap.sampling_obstacles
+        obstacles = self.roadmap.obstacles + self.roadmap.obstacles
 
         boundary_points = self.roadmap.get_boundary_points(obstacles, self.segment_length)
         points = np.concat([points, boundary_points])
@@ -98,7 +98,7 @@ class CVT:
             
             region = [voronoi.vertices[i] for i in region_idx]
             cell_polygon = Polygon(region)
-            if self.roadmap.is_sampling_geometry_collision(cell_polygon):
+            if self.roadmap.is_geometry_collision(cell_polygon):
                 continue
 
             if cell_polygon.is_valid and not cell_polygon.is_empty:
@@ -108,7 +108,7 @@ class CVT:
 
                 chi2_val = chi2.ppf(self.confidence_interval, df=2)
                 mean = d
-                assert B[0] is not None, "Invalid polygon."
+                assert B is not None and B[0] is not None, "Invalid polygon."
                 cov = B.T @ B / chi2_val
                 samples.append(np.array(mean))
                 g_nodes.append(GaussianGraphNode(mean, cov))

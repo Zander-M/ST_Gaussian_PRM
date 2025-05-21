@@ -6,8 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 
-from swarm_prm.envs.roadmap import Roadmap, Obstacle
-from swarm_prm.solvers.utils.gaussian_utils import *
+from swarm_prm.envs.obstacle_map import ObstacleMap, Obstacle
+from swarm_prm.utils.gaussian_utils import *
 
 class RRTNode:
     """

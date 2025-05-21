@@ -12,8 +12,7 @@ import numpy as np
 
 from swarm_prm.utils.gaussian_prm import GaussianPRM
 from swarm_prm.utils.gaussian_utils import GaussianGraphNode
-from swarm_prm.envs.roadmap import Roadmap, Obstacle 
-from swarm_prm.envs.instance import Instance
+from swarm_prm.envs.obstacle_map import ObstacleMap, Obstacle 
 
 MAP_PATH = "../maps"
 
@@ -22,13 +21,13 @@ plt.ioff()
 # Curated Test Examples
 maps = {
         "empty":{
-                "roadmap" : Roadmap(100, 100), 
+                "obstacle_map" : ObstacleMap(100, 100), 
                 "obstacles" : [], 
                 "starts" : np.array([[10, 10], [10, 90]]), 
                 "goals" : np.array([[90, 90], [90, 10]])             
                 },
         "corridor":{
-                "roadmap" : Roadmap(100, 100), 
+                "obstacle_map" : ObstacleMap(100, 100), 
                 "obstacles" : [
                                 Obstacle(None, "POLYGON", [(30, 0), (30, 40), (70, 40), (70, 0)]),
                                 Obstacle(None, "POLYGON", [(30, 100), (30, 60), (70, 60), (70, 100)])
@@ -37,7 +36,7 @@ maps = {
                 "goals" : np.array([[90, 90], [90, 10]])             
                 },
         "corridor_narrow":{
-                "roadmap" : Roadmap(100, 100), 
+                "obstacle_map" : ObstacleMap(100, 100), 
                 "obstacles" : [
                                 Obstacle(None, "POLYGON", [(30, 0), (30, 45), (70, 45), (70, 0)]),
                                 Obstacle(None, "POLYGON", [(30, 100), (30, 55), (70, 55), (70, 100)])
@@ -46,7 +45,7 @@ maps = {
                 "goals" : np.array([[90, 90], [90, 10]])             
                 },
         "corridor_exchange":{
-                "roadmap" : Roadmap(100, 100), 
+                "obstacle_map" : ObstacleMap(100, 100), 
                 "obstacles" : [
                                 Obstacle(None, "POLYGON", [(30, 0), (30, 40), (70, 40), (70, 0)]),
                                 Obstacle(None, "POLYGON", [(30, 100), (30, 60), (70, 60), (70, 100)])
@@ -55,7 +54,7 @@ maps = {
                 "goals" : np.array([[10, 90], [90, 90]])
                 },
         "obstacle":{
-                "roadmap" : Roadmap(200, 160), 
+                "obstacle_map" : ObstacleMap(200, 160), 
                 "obstacles" : [
                                 Obstacle(None, "POLYGON", [(50, 0), (60, 75), (75, 75), (90, 40), (90, 0)]),
                                 Obstacle(None, "POLYGON", [(50, 130), (75, 127), (80, 100), (55, 103)]),
@@ -67,7 +66,7 @@ maps = {
                 "goals" : np.array([[175, 125], [175, 50]])
                 },
         "cross":{
-                "roadmap" : Roadmap(100, 100), 
+                "obstacle_map" : ObstacleMap(100, 100), 
                 "obstacles" : [
                                 Obstacle(None, "POLYGON", [(0, 0), (30, 00), (30, 30), (0, 30)]),
                                 Obstacle(None, "POLYGON", [(70, 0), (100, 00), (100, 30), (70, 30)]),
@@ -78,7 +77,7 @@ maps = {
                 "goals" : np.array([[80, 50], [50, 80]])
                 },
         "multiagent": {
-            "roadmap": Roadmap(200, 200),
+            "obstacle_map": ObstacleMap(200, 200),
             "obstacles": [], 
             "starts" : np.array([[70, 50], [70, 150], [130, 50], [130, 150]]), 
             "goals" : np.array([[25, 50], [25, 150], [175, 50], [175, 150]])
@@ -113,13 +112,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     for map_type in args.map_type:
         for num_sample in args.num_samples:
-            roadmap = maps[map_type]["roadmap"]
+            obstacle_map = maps[map_type]["obstacle_map"]
             for obs in maps[map_type]["obstacles"]:
-                roadmap.add_obstacle(obs)
+                obstacle_map.add_obstacle(obs)
             g_starts = [GaussianGraphNode(start, None, "UNIFORM", radius=10) for start in maps[map_type]["starts"]]
             g_goals = [GaussianGraphNode(goal, None, "UNIFORM", radius=10) for goal in maps[map_type]["goals"]]
-            instance = Instance(roadmap, g_starts, g_goals)
-            gaussian_prm = GaussianPRM(instance, num_sample)
+            gaussian_prm = GaussianPRM(obstacle_map, num_sample)
             map_fname = "{}_{}".format(map_type, num_sample)
             path = os.path.join(args.map_path, map_fname)
             gaussian_prm.roadmap_construction()

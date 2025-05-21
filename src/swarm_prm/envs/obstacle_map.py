@@ -1,5 +1,5 @@
 """
-    Roadmap objects
+    Obstacle Map objects
 """
 
 from matplotlib import pyplot as plt
@@ -15,12 +15,11 @@ from swarm_prm.utils import GaussianNode
 
 ##### Roadmap       #####
 
-class Roadmap:
+class ObstacleMap:
     def __init__(self, width, height, map_name=None) -> None:
         self.width = width
         self.height = height
         self.obstacles:list[Obstacle] = []
-        self.sampling_obstacles:list[Obstacle] = []
         self.map_name = map_name
 
     def get_map_size(self):
@@ -34,12 +33,6 @@ class Roadmap:
             Add obstacles to the environment
         """
         self.obstacles.append(obstacle)
-    
-    def add_sampling_obstacle(self, obstacle):
-        """
-            Add obstacles that only affects sampling 
-        """
-        self.sampling_obstacles.append(obstacle)
     
     def get_clear_radius(self, point):
         """
@@ -105,7 +98,6 @@ class Roadmap:
         """
             Check if a line collides with the environment
         """
-
         # boundary check
 
         if line_start[0] < 0 or line_start[0] > self.width:
@@ -223,24 +215,6 @@ class Roadmap:
             if obs.is_geometry_colliding(geom):
                 return True
         return False
-    
-    def is_sampling_geometry_collision(self, geom):
-        """
-            Check if geometry collides with obstacles and the sampling obstacles 
-        """
-        for obs in self.sampling_obstacles:
-            if obs.is_geometry_colliding(geom):
-                return True
-        if self.is_geometry_collision(geom):
-            return True
-        return False
-    
-    def is_sampling_point_collision(self, point):
-        """
-            Check if point collides with obstacles and the sampling obstacles
-        """
-        point = Point(point)
-        return self.is_sampling_geometry_collision(point)
 
     def visualize(self, fig=None, ax=None):
         """
@@ -411,7 +385,7 @@ class MapGenerator:
         self.roadmaps = []
         for i in range(self.roadmap_count):
             self.roadmap_names.append("{}_{:01d}.yaml".format(self.roadmap_fname, i))
-            map_instance = Roadmap(self.width, self.height)
+            map_instance = ObstacleMap(self.width, self.height)
             self.add_obstacles(map_instance)
             self.roadmaps.append(map_instance)
 
@@ -462,7 +436,7 @@ class MapLoader:
         with open(fname, "r") as f:
             data = f.read()
         map_dict = yaml.load(data, Loader=yaml.SafeLoader)
-        roadmap = Roadmap(map_dict["width"], map_dict["height"])
+        roadmap = ObstacleMap(map_dict["width"], map_dict["height"])
         for obs in map_dict["obstacles"]:
             roadmap.add_obstacle(Obstacle([obs["x"], obs["y"]], "CIRCLE", obs["radius"]))
         self.map = roadmap

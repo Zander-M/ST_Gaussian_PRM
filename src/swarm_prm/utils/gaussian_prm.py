@@ -15,35 +15,152 @@ from shapely.geometry import Point, Polygon
 from swarm_prm.utils.gaussian_utils import *
 from swarm_prm.utils.cvt import CVT
 
+### Sampling Methods
+
+def uniform_sampling(raw_map, num_samples, **kwargs):
+    """
+        Sample uniformly in the configuration space
+    """ 
+    samples = []
+    gaussian_nodes = []
+    safety_radius = kwargs.get("safety_radius", None)
+    check_collision = (
+        lambda n: raw_map.is_radius_collision(n, safety_radius)
+        if safety_radius is not None
+        else raw_map.is_point_collision(n)
+    )
+    
+    while len(samples) < num_samples:
+        x = np.random.uniform(0, raw_map.width)
+        y = np.random.uniform(0, raw_map.height)
+        node = np.array((x, y))
+
+        if check_collision(node):
+            continue
+        radius = np.inf
+        for obs in raw_map.obstacles:
+            radius = min(radius, obs.get_dist(node))
+        g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
+        samples.append(node)
+        gaussian_nodes.append(g_node)
+    return samples, gaussian_nodes
+
+def halton_sampling(raw_map, num_samples, **kwargs):
+    """
+        Halton sampling in the configuration space
+    """
+    samples = []
+    gaussian_nodes = []
+    halton_sampler = Halton(d=2) # 2d Halton sampler
+
+    check_collision = (
+        lambda n: raw_map.is_radius_collision(n, safety_radius)
+        if safety_radius is not None
+        else raw_map.is_point_collision(n)
+    )
+
+    while len(samples) < num_samples:
+        num_to_generate = max(num_samples * 2, 100)
+        sample_points = halton_sampler.random(num_to_generate)
+        nodes = sample_points * np.array([raw_map.width, raw_map.height])
+        safety_radius = kwargs.get("safety_radius", None)
+        # covariance will be automatically updated.
+        for node in nodes:
+            if check_collision(node):
+                continue
+                # safety radius check
+            radius = np.inf
+            for obs in raw_map.obstacles:
+                radius = min(radius, obs.get_dist(node))
+            g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
+            samples.append(node)               
+            gaussian_nodes.append(g_node)
+            if len(samples) >= num_samples:
+                break
+        return samples, gaussian_nodes
+            
+def cvt_sampling(raw_map, num_samples, **kwargs):
+    """
+        Use Centroidal Voronoi Tessellation to sample nodes
+    """
+    cvt_instance = CVT(raw_map, num_samples, iteration=kwargs["iteration"], confidence_interval=kwargs["confidence_interval"])
+    return cvt_instance.get_CVT()
+
+def hexagon_sampling(raw_map, num_samples, **kwargs):
+    """
+        Hexagonal sampling points
+    """
+    samples = []
+    gaussian_nodes = []
+
+    # Function to create a hexagon centered at (x, y) with a given size (radius)
+    def create_hexagon(center_x, center_y, size):
+        return Polygon([(center_x + size * np.cos(2 * np.pi * i / 6), 
+                         center_y + size * np.sin(2 * np.pi * i / 6)) for i in range(6)])
+
+    # Square map boundary
+    map_boundary = Polygon([(0, 0), 
+                            (0, raw_map.height), 
+                            (raw_map.width, raw_map.height), 
+                            (raw_map.width, 0)])  
+
+    hex_width = kwargs["hex_radius"] * 2  # Distance between two horizontal vertices of a hexagon
+    hex_height = np.sqrt(3) * kwargs["hex_radius"]# Vertical distance between hexagon vertices
+
+    # Create hexagonal grid points, reject points 
+    grid_points = []
+    for i in range(0, raw_map.width):  # Adjust range based on map size and hex size
+        for j in range(0, raw_map.height):
+            x_offset = i * hex_width * 3 / 4  # Horizontal spacing
+            y_offset = j * hex_height + (i % 2) * (hex_height / 2)  # Offset every other row
+            hex_center = Point(x_offset, y_offset)
+            if map_boundary.contains(hex_center):
+                grid_points.append((x_offset, y_offset))
+
+    for x, y in grid_points:
+        hexagon = create_hexagon(x, y, kwargs["hex_radius"])
+        if not raw_map.is_geometry_collision(hexagon):
+            node = np.array((x, y))
+            samples.append(node)
+            g_node = GaussianGraphNode(node, None, type="UNIFORM", 
+                                       radius=kwargs["hex_radius"])
+            gaussian_nodes.append(g_node)
+    return samples, gaussian_nodes
+
+sampling_methods = {
+    "UNIFORM": uniform_sampling,
+    "HALTON": halton_sampling,
+    "CVT": cvt_sampling,
+    "HEXAGON": hexagon_sampling
+}
+
+sampling_config = {
+    "UNIFORM": {"safety_radius": 2.0},
+    "HALTON": {"safety_radius": 2.0},
+    "CVT": {"iteration": 500, "confidence_interval": 0.95},
+    "HEXAGON": {"hex_radius": 2.0, }
+}
+
+### Gaussian PRM
+
 class GaussianPRM:
     """
         Gaussian PRM
     """
 
-    def __init__(self, instance, num_samples, 
+    def __init__(self, obstacle_map, num_samples, 
                  alpha=0.95, cvar_threshold=-8,
-                 confidence_interval=0.95,
-                 mc_threshold=0.02,
-                 safety_radius=2.0,
                  swarm_prm_covariance_scaling=5,
                  cvt_iteration=10,
                  hex_radius=2
                  ) -> None:
 
         # PARAMETERS
-        self.instance = instance
+        self.obstacle_map = obstacle_map
         self.num_samples = num_samples
-        self.raw_map = self.instance.roadmap
-        self.starts = self.instance.starts
-        self.goals = self.instance.goals
 
         self.alpha = alpha
         self.cvar_threshold = cvar_threshold
-        self.safety_radius = safety_radius
-        self.confidence_interval = confidence_interval
-
-        # Monte Carlo Sampling strategy
-        self.mc_threshold = mc_threshold
 
         # SwarmPRM Sampling strategy
         self.swarm_prm_covariance_scalling= swarm_prm_covariance_scaling
@@ -59,17 +176,7 @@ class GaussianPRM:
         self.gaussian_nodes = []
         self.roadmap = []
         self.roadmap_cost = []
-
         self.shortest_paths = []
-
-        # Add starts and goals to the map
-        self.starts_idx = [i for i in range(len(self.samples), len(self.samples) + len(self.starts))]
-        self.samples.extend([start.get_mean() for start in self.starts])
-        self.gaussian_nodes.extend(self.starts)
-
-        self.goals_idx = [i for i in range(len(self.samples), len(self.samples) + len(self.goals))]
-        self.samples.extend([goal.get_mean() for goal in self.goals])
-        self.gaussian_nodes.extend(self.goals)
 
     def add_sample(self, sample):
         """
@@ -103,160 +210,9 @@ class GaussianPRM:
             Sample points on the map uniformly random
             TODO: add Gaussian Sampling perhaps?
         """
-
-        if sampling_strategy == "UNIFORM":
-            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
-            while len(self.samples) < self.num_samples:
-                x = np.random.uniform(min_x, max_x)
-                y = np.random.uniform(min_y, max_y)
-                node = np.array((x, y))
-                if not self.raw_map.is_point_collision(node):
-                    radius = np.inf
-                    for obs in self.raw_map.obstacles:
-                        radius = min(radius, obs.get_dist(node))
-                    g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
-                    self.samples.append(node)
-                    self.gaussian_nodes.append(g_node)
-
-        elif sampling_strategy == "CVT":
-            """
-                Perform Centroidal Voronoi Tesellation for choosing 
-                Gaussian Points
-            """
-            cvt_instance = CVT(self.raw_map, self.num_samples, iteration=500, confidence_interval=self.confidence_interval)
-            samples, gaussian_nodes = cvt_instance.get_CVT()
-            self.samples.extend(samples)
-            self.gaussian_nodes.extend(gaussian_nodes)
-
-        elif sampling_strategy == "UNIFORM_WITH_RADIUS":
-            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
-            while len(self.samples) < self.num_samples:
-                x = np.random.uniform(min_x, max_x)
-                y = np.random.uniform(min_y, max_y)
-
-                # covariance will be automatically updated.
-                node = np.array((x, y))
-                if not self.raw_map.is_radius_collision(node, self.safety_radius):
-                    radius = np.inf
-                    for obs in self.raw_map.obstacles:
-                        radius = min(radius, obs.get_dist(node))
-                    g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
-                    self.samples.append(node)               
-                    self.gaussian_nodes.append(g_node)
-
-        elif sampling_strategy == "UNIFORM_HALTON":
-            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
-            halton_sampler = Halton(d=2) # 2d Halton sampler
-
-            while len(self.samples) < self.num_samples:
-                num_to_generate = max(self.num_samples * 2, 100)
-                samples = halton_sampler.random(num_to_generate)
-                nodes = samples * np.array([self.raw_map.width, self.raw_map.height])
-
-                # covariance will be automatically updated.
-                for node in nodes:
-                    if not self.raw_map.is_point_collision(node):
-                        radius = np.inf
-                        for obs in self.raw_map.obstacles:
-                            radius = min(radius, obs.get_dist(node))
-                        g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
-                        self.samples.append(node)               
-                        self.gaussian_nodes.append(g_node)
-                        if len(self.samples) >= self.num_samples:
-                            break
-
-        elif sampling_strategy == "UNIFORM_HALTON_RADIUS":
-            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
-            halton_sampler = Halton(d=2) # 2d Halton sampler
-
-            while len(self.samples) < self.num_samples:
-                num_to_generate = max(self.num_samples * 2, 100)
-                samples = halton_sampler.random(num_to_generate)
-                nodes = samples * np.array([self.raw_map.width, self.raw_map.height])
-
-                # covariance will be automatically updated.
-                for node in nodes:
-                    if not self.raw_map.is_radius_collision(node, self.safety_radius):
-                        radius = np.inf
-                        for obs in self.raw_map.obstacles:
-                            radius = min(radius, obs.get_dist(node))
-                        g_node = GaussianGraphNode(node, None, type="UNIFORM", radius=radius)
-                        self.samples.append(node)               
-                        self.gaussian_nodes.append(g_node)
-                        if len(self.samples) >= self.num_samples:
-                            break
-
-        elif sampling_strategy == "SWARMPRM":
-            """
-                Random sampling strategy as shown in SwarmPRM. Sample location 
-                and covariance and check if the sample satisfies the CVaR condition
-            """
-
-            min_x, max_x, min_y, max_y = 0, self.raw_map.width, 0 , self.raw_map.height
-            while len(self.samples) < self.num_samples:
-                x = np.random.uniform(min_x, max_x)
-                y = np.random.uniform(min_y, max_y)
-                node = np.array((x, y))
-                if self.raw_map.is_radius_collision(node, self.safety_radius):
-                    continue
-                
-                mean = np.array((x, y))
-                a = np.random.uniform(low=-self.swarm_prm_covariance_scalling, 
-                                      high = self.swarm_prm_covariance_scalling,
-                                      size=[2, 2])
-                cov = a.T@ a # construct a random positive semidefinite cov matrix
-
-                g_node = GaussianGraphNode(mean, cov, type="RANDOM")
-                if not self.raw_map.is_gaussian_collision(g_node,
-                                                      collision_check_method=collision_check_method,
-                                                      alpha=self.alpha, cvar_threshold=self.cvar_threshold
-                                                      ):
-                    self.samples.append(mean)
-                    self.gaussian_nodes.append(g_node)
-            
-        elif sampling_strategy == "HEXAGON":
-            """
-                Hexagonal map construction
-            """
-
-            # Function to create a hexagon centered at (x, y) with a given size (radius)
-            def create_hexagon(center_x, center_y, size):
-                return Polygon([(center_x + size * np.cos(2 * np.pi * i / 6), 
-                                 center_y + size * np.sin(2 * np.pi * i / 6)) for i in range(6)])
-
-            # Square map boundary
-            map_boundary = Polygon([(0, 0), 
-                                    (0, self.raw_map.height), 
-                                    (self.raw_map.width, self.raw_map.height), 
-                                    (self.raw_map.width, 0)])  
-
-            hex_width = self.hex_radius * 2  # Distance between two horizontal vertices of a hexagon
-            hex_height = np.sqrt(3) * self.hex_radius# Vertical distance between hexagon vertices
-
-            # Create hexagonal grid points, reject points 
-            grid_points = []
-            for i in range(0, self.raw_map.width):  # Adjust range based on map size and hex size
-                for j in range(0, self.raw_map.height):
-                    x_offset = i * hex_width * 3 / 4  # Horizontal spacing
-                    y_offset = j * hex_height + (i % 2) * (hex_height / 2)  # Offset every other row
-                    hex_center = Point(x_offset, y_offset)
-                    if map_boundary.contains(hex_center):
-                        grid_points.append((x_offset, y_offset))
-
-            for x, y in grid_points:
-                hexagon = create_hexagon(x, y, self.hex_radius)
-                if not self.raw_map.is_geometry_collision(hexagon):
-                    node = np.array((x, y))
-                    self.samples.append(node)
-                    g_node = GaussianGraphNode(node, None, type="UNIFORM", 
-                                               radius=self.hex_radius)
-                    self.gaussian_nodes.append(g_node)
-
-        elif sampling_strategy == "GAUSSIAN":
-            assert False, "Unimplemented Gaussian sampling strategy"
-        else:
-            assert False, "Unimplemented sampling strategy"
-        self.new_node_idx = len(self.samples)
+        sampling_method = sampling_methods[sampling_strategy]
+        config = sampling_config[sampling_strategy]
+        self.samples, self.gaussian_nodes = sampling_method(self.obstacle_map, self.num_samples, **config)
 
     def build_roadmap(self, radius=50, roadmap_method="KDTREE", collision_check_method="CVAR"):
         """
@@ -272,14 +228,14 @@ class GaussianPRM:
 
                 # Edge must be collision free with the environment
                 edges = [(i, idx) for idx in indices \
-                         if not self.raw_map.is_gaussian_trajectory_collision(
+                         if not self.obstacle_map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[i],
                              self.gaussian_nodes[idx],
                              collision_check_method=collision_check_method)]
                 self.roadmap.extend(edges)
 
         elif roadmap_method == "TRIANGULATION":
-            boundary_points = self.raw_map.get_boundary_points(self.raw_map.obstacles, 10)
+            boundary_points = self.obstacle_map.get_boundary_points(self.obstacle_map.obstacles, 10)
             points = np.concat(( self.samples, boundary_points))
             tri = Delaunay(points)
             for i, simplex in enumerate(tri.simplices):
@@ -289,9 +245,9 @@ class GaussianPRM:
                         and (simplex[i], simplex[i+1]) not in self.roadmap \
                         and (simplex[i+1], simplex[i]) not in self.roadmap \
                         and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
-                        and not self.raw_map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
+                        and not self.obstacle_map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
                                                            self.gaussian_nodes[simplex[i+1]].mean) \
-                        and not self.raw_map.is_gaussian_trajectory_collision(
+                        and not self.obstacle_map.is_gaussian_trajectory_collision(
                              self.gaussian_nodes[simplex[i]],
                              self.gaussian_nodes[simplex[i+1]],
                              collision_check_method=collision_check_method, num_samples=20):
@@ -307,7 +263,7 @@ class GaussianPRM:
         """
             Get bounding polygons of the map
         """
-        return self.raw_map.get_bounding_polygon()
+        return self.obstacle_map.get_bounding_polygon()
 
     def get_macro_solution(self, flow_dict):
         """
@@ -339,7 +295,7 @@ class GaussianPRM:
         """
             Get obstacles in the space
         """
-        return self.raw_map.get_obstacles()
+        return self.obstacle_map.get_obstacles()
 
     def get_solution(self, flow_dict, timestep, num_agent):
         """
@@ -383,19 +339,7 @@ class GaussianPRM:
             Visualize map only
         """
         fig, ax = plt.subplots(figsize=(10, 10))
-        for start in self.instance.starts:
-            pos = start.get_mean()
-            ax.plot(pos[0], pos[1], 'bo', markersize=3)
-            start.visualize_gaussian(ax=ax, cmap="Reds")
-            # start.visualize(ax=ax, edgecolor="blue")
-
-        for goal in self.instance.goals:
-            pos = goal.get_mean()
-            ax.plot(pos[0], pos[1], 'go', markersize=3)
-            goal.visualize_gaussian(ax=ax, cmap="Blues")
-            # goal.visualize(ax=ax, edgecolor="green")
-
-        for obs in self.raw_map.obstacles:
+        for obs in self.obstacle_map.obstacles:
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
                 # ax.plot(x, y, 'ro', markersize=3)
@@ -405,8 +349,8 @@ class GaussianPRM:
                 ax.fill(x, y, fc="black")
 
         ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.raw_map.width)
-        ax.set_ylim(bottom=0, top=self.raw_map.height)
+        ax.set_xlim(left=0, right=self.obstacle_map.width)
+        ax.set_ylim(bottom=0, top=self.obstacle_map.height)
         return fig, ax
 
 
@@ -492,20 +436,7 @@ class GaussianPRM:
         for (i, j) in self.roadmap:
             ax.plot([self.samples[i][0], self.samples[j][0]], [self.samples[i][1], self.samples[j][1]], 'gray', linestyle='-', linewidth=0.5)
 
-        # Starts and goals
-        for start in self.instance.starts:
-            pos = start.get_mean()
-            ax.plot(pos[0], pos[1], 'bo', markersize=3)
-            start.visualize_gaussian(ax=ax, cmap="Reds")
-            # start.visualize(ax=ax, edgecolor="blue")
-
-        for goal in self.instance.goals:
-            pos = goal.get_mean()
-            ax.plot(pos[0], pos[1], 'go', markersize=3)
-            goal.visualize_gaussian(ax=ax, cmap="Blues")
-            # goal.visualize(ax=ax, edgecolor="green")
-
-        for obs in self.raw_map.obstacles:
+        for obs in self.obstacle_map.obstacles:
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
                 # ax.plot(x, y, 'ro', markersize=3)
@@ -515,8 +446,8 @@ class GaussianPRM:
                 ax.fill(x, y, fc="black")
 
         ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.raw_map.width)
-        ax.set_ylim(bottom=0, top=self.raw_map.height)
+        ax.set_xlim(left=0, right=self.obstacle_map.width)
+        ax.set_ylim(bottom=0, top=self.obstacle_map.height)
         return fig, ax
     
     def visualize_g_nodes(self, fname="test_g_nodes"):
@@ -532,13 +463,7 @@ class GaussianPRM:
             x, y = gaussian_node.get_mean()
             ax.text(x, y, str(i), fontsize=8, ha='center', va='center', color='black')
         
-        for start in self.starts:
-            start.visualize_gaussian(ax=ax, cmap="Reds")
-
-        for goal in self.goals:
-            goal.visualize_gaussian(ax=ax, cmap="Blues")
-
-        for obs in self.raw_map.obstacles:
+        for obs in self.obstacle_map.obstacles:
             if obs.obs_type == "CIRCLE": 
                 x, y = obs.get_pos()
                 # ax.plot(x, y, 'ro', markersize=3)
@@ -548,6 +473,6 @@ class GaussianPRM:
                 ax.fill(x, y, fc="black")
 
         ax.set_aspect('equal')
-        ax.set_xlim(left=0, right=self.raw_map.width)
-        ax.set_ylim(bottom=0, top=self.raw_map.height)
+        ax.set_xlim(left=0, right=self.obstacle_map.width)
+        ax.set_ylim(bottom=0, top=self.obstacle_map.height)
         return fig, ax
