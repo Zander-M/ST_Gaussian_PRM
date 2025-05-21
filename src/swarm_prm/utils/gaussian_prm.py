@@ -95,7 +95,7 @@ class GaussianPRM:
         """
             Build Gaussian PRM
         """
-        self.sample_free_space() # sample node locations 
+        self.sample_free_space(sampling_strategy="CVT", collision_check_method="CVAR") # sample node locations 
         self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
 
     def sample_free_space(self, sampling_strategy="CVT", collision_check_method="CVAR"):
@@ -529,6 +529,8 @@ class GaussianPRM:
         cmap = plt.get_cmap('tab10')
         for i, gaussian_node in enumerate(self.gaussian_nodes):
             gaussian_node.visualize(ax, edgecolor=cmap(i%10))
+            x, y = gaussian_node.get_mean()
+            ax.text(x, y, str(i), fontsize=8, ha='center', va='center', color='black')
         
         for start in self.starts:
             start.visualize_gaussian(ax=ax, cmap="Reds")
