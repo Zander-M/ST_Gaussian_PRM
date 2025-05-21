@@ -71,8 +71,8 @@ class DRRTSolver(MacroSolverBase):
         # accroding to the paper, random state only depends of the dimension of
         # each agents' configuration space.
 
-        xs = np.random.uniform(0, self.map.width, self.num_agents)
-        ys = np.random.uniform(0, self.map.height, self.num_agents)
+        xs = np.random.uniform(0, self.obstacle_map.width, self.num_agents)
+        ys = np.random.uniform(0, self.obstacle_map.height, self.num_agents)
         q_rand = np.column_stack((xs, ys)) 
         nn_time = time.time()
         v_near = self.nearest_neighbor(q_rand)
@@ -112,7 +112,7 @@ class DRRTSolver(MacroSolverBase):
         """
         next_state = []
         for agent in range(self.num_agents):
-            if v_near[agent] in self.gaussian_prm.goals_idx: 
+            if v_near[agent] in self.goals: 
                 # Agent wait at goal
                 next_state.append(v_near[agent])
                 continue

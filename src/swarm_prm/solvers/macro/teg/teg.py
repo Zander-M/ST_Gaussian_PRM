@@ -26,8 +26,8 @@ class TEGSolver(MacroSolverBase):
         """
             Find the ealiest timestep for any agent to reach any goal using bfs
         """
-        open_list = deque(zip([start for start in self.gaussian_prm.starts_idx], [0] * len(self.gaussian_prm.starts_idx)))
-        goals = set(self.gaussian_prm.goals_idx)
+        open_list = deque(zip([start for start in self.starts], [0] * len(self.starts)))
+        goals = set(self.goals)
         visited = set()
         while open_list:
             curr_node, time = open_list.popleft() 
@@ -139,7 +139,7 @@ class TEGSolver(MacroSolverBase):
         """
         ### TEG
         # update edges to super sink
-        for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
+        for i, goal_idx in enumerate(self.goals):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
@@ -160,7 +160,7 @@ class TEGSolver(MacroSolverBase):
                 residual_dict[(v, timestep, OUT_NODE)][(v, timestep, IN_NODE)] = 0
 
         # update goals. Preserve flow from previous residual flow
-        for i, goal_idx in enumerate(self.gaussian_prm.goals_idx):
+        for i, goal_idx in enumerate(self.goals):
             flow = residual_dict[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
             residual_dict[(goal_idx, timestep-1, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = float("inf")
@@ -201,8 +201,8 @@ class TEGSolver(MacroSolverBase):
                 return {
                     "timestep": timestep, 
                     "g_nodes": self.gaussian_prm.gaussian_nodes,
-                    "starts_idx": self.gaussian_prm.starts_idx,
-                    "goals_idx": self.gaussian_prm.goals_idx,
+                    "starts_idx": self.starts,
+                    "goals_idx": self.goals,
                     "paths": paths,
                     "cost" : cost,
                     "flow_dict": flow_dict, 
