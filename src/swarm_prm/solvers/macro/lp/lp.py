@@ -26,8 +26,8 @@ class LPSolver(MacroSolverBase):
         path_cost = []
         paths = []
         max_path_len = 0
-        for start in self.starts:
-            for goal in self.goals:
+        for start in self.starts_idx:
+            for goal in self.goals_idx:
                 path, cost= self.dijkstra(start, goal)
                 path_idx.append((start, goal))
                 path_cost.append(cost)
@@ -97,12 +97,12 @@ class LPSolver(MacroSolverBase):
         constraints = []
 
         # 1. Start location constraints
-        for i, start in enumerate(self.starts):
+        for i, start in enumerate(self.starts_idx):
             start_indices = [j for j, path in enumerate(shortest_paths) if path[0] == start]
             constraints.append(cp.sum(x[start_indices]) == self.starts_agent_count[i])
 
         # 2. Goal location constraints
-        for i, goal in enumerate(self.goals):
+        for i, goal in enumerate(self.goals_idx):
             goal_indices = [j for j, path in enumerate(shortest_paths) if path[-1] == goal]
             constraints.append(cp.sum(x[goal_indices]) == self.goals_agent_count[i])
 

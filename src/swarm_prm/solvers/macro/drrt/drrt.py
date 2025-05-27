@@ -26,15 +26,15 @@ class DRRTSolver(MacroSolverBase):
         self.iterations = kwargs.get("iterations", 1) # iterations per goal state check
 
         # Define goal state
-        starts_loc = [self.nodes[idx] for idx in self.starts]
-        goals_loc = [self.nodes[idx] for idx in self.goals]
+        starts_loc = [self.nodes[idx] for idx in self.starts_idx]
+        goals_loc = [self.nodes[idx] for idx in self.goals_idx]
         dists = cdist(starts_loc, goals_loc)
         _, self.goal_state= linear_sum_assignment(dists)
         self.goal_state = tuple(self.goal_state)
 
         # initialize agent location
         self.start_state = []
-        for i, start_idx in enumerate(self.starts):
+        for i, start_idx in enumerate(self.starts_idx):
             self.start_state += [start_idx] * self.starts_agent_count[i]
         self.start_state = tuple(self.start_state)
 
@@ -112,7 +112,7 @@ class DRRTSolver(MacroSolverBase):
         """
         next_state = []
         for agent in range(self.num_agents):
-            if v_near[agent] in self.goals: 
+            if v_near[agent] in self.goals_idx: 
                 # Agent wait at goal
                 next_state.append(v_near[agent])
                 continue

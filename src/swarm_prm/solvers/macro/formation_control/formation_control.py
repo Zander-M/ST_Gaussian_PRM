@@ -61,9 +61,9 @@ class FormationControlSovler(MacroSolverBase):
         # initialize start formation and goal formation
         # We take the intersetion of the start nodes and goal nodes as
         # the start/goal formation
-        convex_starts = [self.iris_sampler.sample(self.nodes[start]) for start in self.starts]
+        convex_starts = [self.iris_sampler.sample(self.nodes[start]) for start in self.starts_idx]
         start_poly = shapely.intersection_all(convex_starts)
-        convex_goals= [self.iris_sampler.sample(self.nodes[goal]) for goal in self.goals]
+        convex_goals= [self.iris_sampler.sample(self.nodes[goal]) for goal in self.goals_idx]
         goal_poly = shapely.intersection_all(convex_goals)
         convex_nodes = [ConvexNode(start_poly, None)]
         start_time = time.time()
@@ -102,11 +102,11 @@ class FormationControlSovler(MacroSolverBase):
         """
             Return collision free random point on the map
         """
-        x = np.random.randint(0, self.gaussian_prm.raw_map.width)
-        y = np.random.randint(0, self.gaussian_prm.raw_map.height)
-        if self.gaussian_prm.raw_map.is_point_collision((x, y)):
-            x = np.random.randint(0, self.gaussian_prm.raw_map.width)
-            y = np.random.randint(0, self.gaussian_prm.raw_map.height)
+        x = np.random.randint(0, self.gaussian_prm.obstacle_map.width)
+        y = np.random.randint(0, self.gaussian_prm.obstacle_map.height)
+        if self.gaussian_prm.obstacle_map.is_point_collision((x, y)):
+            x = np.random.randint(0, self.gaussian_prm.obstacle_map.width)
+            y = np.random.randint(0, self.gaussian_prm.obstacle_map.height)
         return np.array([x, y])
     
     def check_connection(self, poly1, poly2):
@@ -142,12 +142,12 @@ class FormationControlSovler(MacroSolverBase):
         starts_idx = []
         goals_idx = []
 
-        for start in self.starts:
+        for start in self.starts_idx:
             g_nodes.append(self.gaussian_prm.gaussian_nodes[start])
             starts_idx.append(node_idx)
             node_idx += 1 
         
-        for goal in self.goals:
+        for goal in self.goals_idx:
             g_nodes.append(self.gaussian_prm.gaussian_nodes[goal])
             goals_idx.append(node_idx)
             node_idx += 1

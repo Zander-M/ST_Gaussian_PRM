@@ -291,6 +291,18 @@ class GaussianPRM:
                     macro_solution[t][u].append((v, flow_value))
         return macro_solution
 
+    def get_node_index(self, regions):
+        """
+            Get node indices contained in the provided polygon. Used to
+            filter start nodes and goal nodes
+        """
+        indices = []
+        for region in regions:
+            for i, sample in enumerate(self.samples):
+                if region.contains(Point(sample)):
+                    indices.append(i)
+        return indices
+    
     def get_obstacles(self):
         """
             Get obstacles in the space
@@ -352,7 +364,6 @@ class GaussianPRM:
         ax.set_xlim(left=0, right=self.obstacle_map.width)
         ax.set_ylim(bottom=0, top=self.obstacle_map.height)
         return fig, ax
-
 
     def visualize_solution(self, flow_dict, timestep, num_agent):
         """
@@ -423,7 +434,7 @@ class GaussianPRM:
                              blit=True, interval=100)
         anim.save("test_solution_path.gif", writer='pillow', fps=6)
 
-    def visualize_roadmap(self, fname="test_gaussian_prm"):
+    def visualize_roadmap(self):
         """
             Visualize Gaussian PRM
         """
@@ -450,7 +461,7 @@ class GaussianPRM:
         ax.set_ylim(bottom=0, top=self.obstacle_map.height)
         return fig, ax
     
-    def visualize_g_nodes(self, fname="test_g_nodes"):
+    def visualize_g_nodes(self):
         """
             Visualize Gaussian Nodes on the map
         """
@@ -458,9 +469,10 @@ class GaussianPRM:
 
         # Visualize G nodes
         cmap = plt.get_cmap('tab10')
-        for i, gaussian_node in enumerate(self.gaussian_nodes):
-            gaussian_node.visualize(ax, edgecolor=cmap(i%10))
-            x, y = gaussian_node.get_mean()
+        for i, g_node in enumerate(self.gaussian_nodes):
+            # g_node.visualize(ax=ax, edgecolor=cmap(i%10))
+            g_node.visualize(ax=ax, edgecolor='gray')
+            x, y = g_node.get_mean()
             ax.text(x, y, str(i), fontsize=8, ha='center', va='center', color='black')
         
         for obs in self.obstacle_map.obstacles:

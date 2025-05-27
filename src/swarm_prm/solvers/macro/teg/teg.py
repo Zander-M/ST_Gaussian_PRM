@@ -26,8 +26,8 @@ class TEGSolver(MacroSolverBase):
         """
             Find the ealiest timestep for any agent to reach any goal using bfs
         """
-        open_list = deque(zip([start for start in self.starts], [0] * len(self.starts)))
-        goals = set(self.goals)
+        open_list = deque(zip([start for start in self.starts_idx], [0] * len(self.starts_idx)))
+        goals = set(self.goals_idx)
         visited = set()
         while open_list:
             curr_node, time = open_list.popleft() 
@@ -89,11 +89,11 @@ class TEGSolver(MacroSolverBase):
         super_sink = ("SG", None, IN_NODE)
 
         # Adding super source and super goal to the graph
-        for i, start_idx in enumerate(self.starts):
+        for i, start_idx in enumerate(self.starts_idx):
             teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i]
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
-        for i, goal_idx in enumerate(self.goals):
+        for i, goal_idx in enumerate(self.goals_idx):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
 
         # adding graph edges
@@ -139,7 +139,7 @@ class TEGSolver(MacroSolverBase):
         """
         ### TEG
         # update edges to super sink
-        for i, goal_idx in enumerate(self.goals):
+        for i, goal_idx in enumerate(self.goals_idx):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
             del teg[(goal_idx, timestep-1, OUT_NODE)][super_sink]                
 
@@ -160,7 +160,7 @@ class TEGSolver(MacroSolverBase):
                 residual_dict[(v, timestep, OUT_NODE)][(v, timestep, IN_NODE)] = 0
 
         # update goals. Preserve flow from previous residual flow
-        for i, goal_idx in enumerate(self.goals):
+        for i, goal_idx in enumerate(self.goals_idx):
             flow = residual_dict[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
             residual_dict[(goal_idx, timestep-1, OUT_NODE)][(goal_idx, timestep, IN_NODE)] = float("inf")
@@ -201,8 +201,8 @@ class TEGSolver(MacroSolverBase):
                 return {
                     "timestep": timestep, 
                     "g_nodes": self.gaussian_prm.gaussian_nodes,
-                    "starts_idx": self.starts,
-                    "goals_idx": self.goals,
+                    "starts_idx": self.starts_idx,
+                    "goals_idx": self.goals_idx,
                     "paths": paths,
                     "cost" : cost,
                     "flow_dict": flow_dict, 

@@ -11,7 +11,8 @@ from swarm_prm.utils import GaussianPRM
 
 class MacroSolverBase(ABC):
     def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
-                 num_agents, starts_agent_count, goals_agent_count, starts_idx, goals_idx, 
+                 num_agents, starts_agent_count, goals_agent_count, 
+                 starts_idx, goals_idx, 
                  time_limit=100, **kwargs) -> None:
         self.gaussian_prm = gaussian_prm
         self.obstacle_map = self.gaussian_prm.obstacle_map # Map geometry
@@ -22,8 +23,8 @@ class MacroSolverBase(ABC):
         self.goals_agent_count = goals_agent_count
 
         # starts and goals are now required for each planning instance
-        self.starts = starts_idx
-        self.goals = goals_idx
+        self.starts_idx = starts_idx
+        self.goals_idx = goals_idx
         self.time_limit = time_limit
 
         self.roadmap, self.cost_dict = self.build_roadmap_with_cost()
@@ -31,11 +32,11 @@ class MacroSolverBase(ABC):
         self.node_capacity = [node.get_capacity(agent_radius) for node in self.gaussian_prm.gaussian_nodes]
 
         # Verify if instance is feasible
-        for i, start in enumerate(self.starts):
+        for i, start in enumerate(self.starts_idx):
             assert self.node_capacity[start] >= self.starts_agent_count[i],\
                 "Start capacity smaller than required."
 
-        for i, goal in enumerate(self.goals):
+        for i, goal in enumerate(self.goals_idx):
             assert self.node_capacity[goal] >= self.goals_agent_count[i], \
                 "Goal capacity smaller than required."
         self.init_solver(**kwargs)

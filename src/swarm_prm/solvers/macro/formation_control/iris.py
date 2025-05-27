@@ -24,9 +24,9 @@ from pydrake.geometry.optimization import Iris # type:ignore
 
 class IrisSampler:
     def __init__(self, gaussian_prm):
-        self.obstacles = [obs.geom for obs in gaussian_prm.raw_map.obstacles]
-        self.width = gaussian_prm.raw_map.width
-        self.height = gaussian_prm.raw_map.height
+        self.obstacles = [obs.geom for obs in gaussian_prm.obstacle_map.obstacles]
+        self.width = gaussian_prm.obstacle_map.width
+        self.height = gaussian_prm.obstacle_map.height
 
     def sample(self, sample):
         """
