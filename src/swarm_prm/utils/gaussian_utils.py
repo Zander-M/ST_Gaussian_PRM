@@ -142,7 +142,7 @@ class GaussianGraphNode(GaussianNode):
             self.alpha = alpha
             self.radius = radius
 
-    def get_capacity(self, agent_radius, threshold=.95):
+    def get_capacity(self, agent_radius, threshold=.3):
         """
             Compute capacity based on safe area and agent radius.
         """
@@ -157,7 +157,7 @@ class GaussianGraphNode(GaussianNode):
             eigenvalues = eigenvalues[order]
             eigenvectors = eigenvectors[:, order]
             chi2_value = chi2.ppf(self.alpha, 2) 
-            width, height = 2 * np.sqrt(chi2_value * eigenvalues)
+            width, height = np.sqrt(chi2_value * eigenvalues)
 
             # apply a small threshold to guarantee feasibility
             return floor(width * height / (agent_radius * agent_radius)*threshold)

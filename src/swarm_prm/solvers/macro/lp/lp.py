@@ -138,6 +138,9 @@ class LPSolver(MacroSolverBase):
 
             return {
                 "success": True,
+                "g_nodes": self.gaussian_prm.gaussian_nodes,
+                "starts_idx": self.starts_idx,
+                "goals_idx": self.goals_idx,
                 "timestep": max([len(path) for path in paths]),
                 "paths": paths,  
                 "cost": cost,

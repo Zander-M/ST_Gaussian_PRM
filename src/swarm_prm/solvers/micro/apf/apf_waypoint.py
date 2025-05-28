@@ -153,25 +153,23 @@ class APFWaypointSolver:
             Visualize solution trajectory provided instance
         """
         agents = []
+        cmap = plt.get_cmap("tab10")
+        
+        for i in range(len(paths)):
+            loc = paths[i][0]
+            circle = Circle((loc[0], loc[1]), radius=self.agent_radius, color=cmap(i % 10))
+            agents.append(circle)
+            ax.add_patch(circle)
 
         def init():
-            for agent in agents:
-                agent.remove()
-            agents.clear()
-            return []
+            return agents
 
         def update(frame):
-            for agent in agents:
-                agent.remove()
-            agents.clear()
-            cmap = plt.get_cmap("tab10")
-            locs = [traj[frame] for traj in paths]
-            for i, loc in enumerate(locs):
-                agent = ax.add_patch(Circle((loc[0], loc[1]), radius=self.agent_radius, color=cmap(i%10)))
-                agents.append(agent)
+            for agent, traj in zip(agents, paths):
+                agent.set_center(traj[frame])
             return agents
 
         anim = FuncAnimation(fig, update, frames=self.solution_length, 
                              init_func=init, blit=True, interval=100)
-        anim.save(f"{fig_path}/apf_solution.gif", writer='pillow', fps=6)
+        anim.save(f"{fig_path}/apf_solution.mp4", writer='ffmpeg', fps=6)
 

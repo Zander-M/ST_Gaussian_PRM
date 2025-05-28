@@ -124,79 +124,65 @@ class EvaluationSolver:
         return trajectory
 
     def solve(self):
-        """
-            Find trajectories per timestep. We find start-goal pairs based on minimizing
-            sum of distances between start and goal points.
-        """
-
         solution = [[] for _ in range(self.num_agents)]
         curr_agent_idx = 0
 
-        # Initialize agent locations
+        # Step 1: assign agents to start samples
         for i, start_idx in enumerate(self.starts_idx):
-
-            # skip empty starts
             if self.starts_agent_count[i] == 0:
                 continue
-
-            # sample start locations
-            gaussian_samples = self.get_node_samples(start_idx, self.starts_agent_count[i])
-
-            for sample in gaussian_samples:
-                self.agent_locations[curr_agent_idx] = sample
+            samples = self.get_node_samples(start_idx, self.starts_agent_count[i])
+            for s in samples:
+                self.agent_locations[curr_agent_idx] = s
                 self.node_agents[start_idx].append(curr_agent_idx)
-                solution[curr_agent_idx].append(sample)
+                solution[curr_agent_idx].append(s)
                 curr_agent_idx += 1
-        
-        for t in range(self.timestep+1):
-      
-            # Reset Agent assingment
-            self.agent_assigned = [False] * self.num_agents
 
-            # Index incoming flows for each target node
-            incoming_flow = defaultdict(list)
-            for prev_node in self.macro_solution[t]:
-                for node, flow in self.macro_solution[t][prev_node]:
-                    incoming_flow[node].append((prev_node, flow))
-            
-            next_node_agents = []
-            trajectories = []
-            
-            # sample new locations in next state nodes
-            for node in incoming_flow:
-                # gather all agents coming to the same goal
-                incoming_agents = []
-                for prev_node, flow in incoming_flow[node]:
-                    agents_idx = self.choose_unassigned_agents(prev_node, node, flow) 
-                    incoming_agents += agents_idx
-                    for agent in agents_idx:
-                        self.agent_assigned[agent] = True
-
-                gaussian_samples = self.get_node_samples(node, len(incoming_agents))
-
-                # update agent locations
-                trajectories.append(self.update_agent_locations(incoming_agents, gaussian_samples))
-
-                # store next step agent list 
-                next_node_agents.append((node, incoming_agents))
-
-            # update next node agents location
+        # Step 2: step through macro flow
+        for t in range(self.timestep + 1):
             new_node_agents = defaultdict(list)
-            for node_idx, agents in next_node_agents:
-                new_node_agents[node_idx].extend(agents)
+
+            for prev_node in self.macro_solution[t]:
+                agents = self.node_agents[prev_node]
+                start = 0
+
+                for next_node, flow in self.macro_solution[t][prev_node]:
+                    if flow == 0:
+                        continue
+
+                    subset = agents[start:start + flow]
+                    if len(subset) < flow:
+                        break
+                    start += flow
+
+                    # Sample targets and assign
+                    samples = self.get_node_samples(next_node, flow)
+                    if len(samples) < flow:
+                        continue
+
+                    prev_pos = np.array([self.agent_locations[a] for a in subset])
+                    cost_matrix = cdist(prev_pos, samples)
+                    row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+                    for r, c in zip(row_ind, col_ind):
+                        agent = subset[r]
+                        pos = samples[c]
+                        self.agent_locations[agent] = pos
+                        new_node_agents[next_node].append(agent)
+                        solution[agent].append(pos)
+
             self.node_agents = new_node_agents
 
-            for trajectory in trajectories:
-                for agent_idx, next_node in trajectory.items():
-                    self.agent_locations[agent_idx] = next_node
-                    solution[agent_idx].append(next_node)
-        solution = np.array(solution) # convert to np array
+            # Pad idle agents who weren't assigned
+            for i in range(self.num_agents):
+                if len(solution[i]) < t + 2:
+                    solution[i].append(solution[i][-1])
 
-        # adding cost (sum of longest transitions within each timesteps)
-        path_costs = []
-        for path in solution:
-            path_costs.append([np.linalg.norm(next_node-prev_node) for prev_node, next_node in zip(path[:-1], path[1:])])
-        path_costs = np.array(path_costs)
+        # Convert and compute cost
+        solution = np.array(solution)
+        path_costs = [
+            [np.linalg.norm(b - a) for a, b in zip(path[:-1], path[1:])]
+            for path in solution
+        ]
         cost = np.sum(np.max(path_costs, axis=0))
         return solution, cost
-    

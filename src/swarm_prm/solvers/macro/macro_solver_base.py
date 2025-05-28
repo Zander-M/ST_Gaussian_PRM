@@ -30,6 +30,7 @@ class MacroSolverBase(ABC):
         self.roadmap, self.cost_dict = self.build_roadmap_with_cost()
         self.nodes = np.array(self.gaussian_prm.samples)
         self.node_capacity = [node.get_capacity(agent_radius) for node in self.gaussian_prm.gaussian_nodes]
+        print("node cap", self.node_capacity)
 
         # Verify if instance is feasible
         for i, start in enumerate(self.starts_idx):
