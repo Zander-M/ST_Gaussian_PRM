@@ -9,37 +9,25 @@ import numpy as np
 import time
 
 
+from swarm_prm.solvers.macro import register_solver, MacroSolverBase
 from swarm_prm.utils.gaussian_prm import GaussianPRM
 from swarm_prm.utils.johnson import johnsons_algorithm
 
-class DRRT_Star:
-    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
-                 starts_agent_count, goals_agent_count, num_agents,
-                 time_limit=6000, iterations=10):
-        """
-            We use the same roadmap for multiple agents. If a Gaussian node
-            does not exceed its capacity, we do not consider it a collision.
-            State is represented as a list of agent node indices.
-        """
-        self.gaussian_prm = gaussian_prm
+@register_solver("DRRTStarSolver")
+class DRRTStarSolver(MacroSolverBase):
+    def init_solver(self, **kwargs):
+        self.iterations = kwargs.get("iterations", 10)
         self.nodes = np.array(self.gaussian_prm.samples)
-        self.num_agents = num_agents
-        self.roadmap = self.gaussian_prm.raw_map
         self.roadmap_neighbors = self.build_neighbors()
         self.shortest_distance = johnsons_algorithm(self.roadmap_neighbors)
-        self.time_limit = time_limit
-        self.iterations = iterations
-        self.agent_radius = agent_radius
 
         # Initialize problem instance
-        self.start_agent_count = starts_agent_count
-        self.goal_agent_count = goals_agent_count
         self.start_state = []
-        for i, start_idx in enumerate(self.gaussian_prm.starts_idx):
-            self.start_state += [start_idx] * self.start_agent_count[i]
+        for i, start_idx in enumerate(self.starts_idx):
+            self.start_state += [start_idx] * self.starts_agent_count[i]
         self.start_state = tuple(self.start_state)
         self.goal_state = {}
-        for node_idx, node_count in zip(self.gaussian_prm.goals_idx, self.goal_agent_count):
+        for node_idx, node_count in zip(self.goals_idx, self.goals_agent_count):
             if node_count > 0:
                 self.goal_state[node_idx] = node_count
 
@@ -50,14 +38,14 @@ class DRRT_Star:
         self.node_capacity = np.array([node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes])
 
         # Verify if instance is feasible
-        for i, start in enumerate(self.gaussian_prm.starts_idx):
-            assert self.node_capacity[start] >= self.start_agent_count[i], \
+        for i, start in enumerate(self.starts_idx):
+            assert self.node_capacity[start] >= self.starts_agent_count[i], \
                 "Start capacity smaller than required."
 
-        for i, goal in enumerate(self.gaussian_prm.goals_idx):
-            assert self.node_capacity[goal] >= self.goal_agent_count[i], \
+        for i, goal in enumerate(self.goals_idx):
+            assert self.node_capacity[goal] >= self.goals_agent_count[i], \
                 "Goal capacity smaller than required."
-       
+
         # DRRT star structure 
         self.visited_states = [self.start_state]
         self.visited_states_idx = {self.start_state: 0}
@@ -164,8 +152,8 @@ class DRRT_Star:
             Expand DRRT Star
         """
         if v_last is None:
-            xs = np.random.uniform(0, self.roadmap.width, self.num_agents)
-            ys = np.random.uniform(0, self.roadmap.height, self.num_agents)
+            xs = np.random.uniform(0, self.obstacle_map.width, self.num_agents)
+            ys = np.random.uniform(0, self.obstacle_map.height, self.num_agents)
             q_rand = np.column_stack((xs, ys)) 
             v_near = self.nearest_neighbor(q_rand)
         else:
@@ -236,7 +224,7 @@ class DRRT_Star:
         """
         return np.sum([self.shortest_distance[(v1, v2)] for v1, v2 in zip(node1, node2)])
 
-    def get_solution(self):
+    def solve(self):
         """
             Get solution per agent
         """
@@ -251,7 +239,12 @@ class DRRT_Star:
                 print("Cost: ", cost)
                 self.best_path = path
                 self.best_path_cost = cost
-        return self.best_path, self.best_path_cost
+        solution = {
+            "success": True,
+            "path" : self.best_path,
+            "cost": self.best_path_cost
+        }
+        return solution
 
     def verify_node(self, node):
         """
