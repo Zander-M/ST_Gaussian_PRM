@@ -39,6 +39,34 @@ def sample_gaussian(g_node, num_points, confidence_interval, min_spacing, candid
             selected.append(point)
     return np.array(selected)
 
+def sample_gaussian_unique(g_node, num_points, confidence_interval, min_spacing, candidates=None):
+    """
+    Return unique Gaussian samples within the confidence interval and spacing.
+    Over-samples to ensure enough valid, unique samples.
+    """
+    chi2_thresh = chi2.ppf(confidence_interval, 2)
+    mean, cov = g_node.get_gaussian()
+
+    if candidates is None:
+        num_candidates = 10000
+        candidates = np.random.multivariate_normal(mean, cov, num_candidates)
+
+    delta = candidates - mean
+    inv_cov = np.linalg.inv(cov)
+    dists = np.einsum("ni, ij, nj ->n", delta, inv_cov, delta)
+    filtered = candidates[dists <= chi2_thresh]
+
+    if len(filtered) == 0:
+        return np.zeros((0, mean.shape[0]))
+
+    selected = [filtered[0]]
+    for point in filtered[1:]:
+        if len(selected) >= num_points:
+            break
+        if np.all(cdist([point], selected)[0] > min_spacing):
+            selected.append(point)
+    return np.array(selected)
+
 class EvaluationSolver:
 
     def __init__(self, gaussian_nodes, macro_solution, agent_radius, timestep,
@@ -58,7 +86,6 @@ class EvaluationSolver:
         self.interpolation_count = interpolation_count
 
         # Gaussian Sampling Parameters
-        # self.safety_gap = 0 
         self.safety_gap = 2*agent_radius
         self.confidence_interval = confidence_interval # Confidence Interval
 
@@ -156,20 +183,28 @@ class EvaluationSolver:
                     start += flow
 
                     # Sample targets and assign
-                    samples = self.get_node_samples(next_node, flow)
+                    samples = self.get_node_samples(next_node, flow * 2)  # over-sample
                     if len(samples) < flow:
                         continue
-
+                    
                     prev_pos = np.array([self.agent_locations[a] for a in subset])
                     cost_matrix = cdist(prev_pos, samples)
                     row_ind, col_ind = linear_sum_assignment(cost_matrix)
-
+                    
+                    used_samples = set()
+                    assigned = 0
                     for r, c in zip(row_ind, col_ind):
+                        if tuple(samples[c]) in used_samples:
+                            continue
                         agent = subset[r]
                         pos = samples[c]
                         self.agent_locations[agent] = pos
                         new_node_agents[next_node].append(agent)
                         solution[agent].append(pos)
+                        used_samples.add(tuple(pos))
+                        assigned += 1
+                        if assigned >= flow:
+                            break
 
             self.node_agents = new_node_agents
 
