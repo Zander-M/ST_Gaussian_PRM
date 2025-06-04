@@ -4,6 +4,7 @@
 from abc import ABC, abstractmethod
 from collections import defaultdict, Counter
 from typing import Dict, Any
+import heapq
 
 import numpy as np
 
@@ -78,6 +79,29 @@ class MacroSolverBase(ABC):
                     violation_percentage = (count-self.node_capacity[state])/self.node_capacity[state]
                     max_violation_percentage = max (violation_percentage, max_violation_percentage)
         return num_violation, max_violation_percentage
+    
+    def get_shortest_path_cost(self, node1, node2):
+        """
+            Get shortest path cost between node 1 and node 2
+        """
+        prev = {node1: None}
+        open_list = [(0, node1)]
+        distances = {node1: 0}
+        while open_list:
+            cost, state = heapq.heappop(open_list)
+            if state == node2:
+                path = []
+                while state is not None:
+                    path.append(state)
+                    state = prev[state]
+                return path[::-1], distances[node2]
+            for neighbor in self.roadmap[state]:
+                curr_cost = cost + self.cost_dict[state][neighbor]
+                if neighbor not in distances or curr_cost < distances[neighbor]:
+                    distances[neighbor] = curr_cost
+                    prev[neighbor] = state
+                    heapq.heappush(open_list, (curr_cost, neighbor))
+        return [], 0
 
     @abstractmethod
     def init_solver(self, **kwargs):

@@ -39,7 +39,8 @@ def sample_gaussian(g_node, num_points, confidence_interval, min_spacing, candid
         distances = cdist([point], selected)[0]
         if np.all(distances > min_spacing):
             selected.append(point)
-    assert len(selected) == num_points, "Not enough samples in the node"
+
+    assert len(selected) == num_points, f"Not enough samples in the node. {len(selected)}/{num_points}"
     return np.array(selected)
 
 def sample_gaussian_qmc_poisson(g_node, num_points, confidence_interval=0.95,
@@ -217,7 +218,8 @@ class EvaluationSolver:
                     start += flow
 
                     # Sample targets and assign
-                    samples = self.get_node_samples(next_node, flow * 2)  # over-sample
+                    # samples = self.get_node_samples(next_node, flow * 2)  # over-sample
+                    samples = self.get_node_samples(next_node, flow)  # over-sample
                     if len(samples) < flow:
                         continue
                     
