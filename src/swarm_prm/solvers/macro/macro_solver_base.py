@@ -2,7 +2,7 @@
     Base Class for macro solver
 """
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import defaultdict, Counter
 from typing import Dict, Any
 
 import numpy as np
@@ -61,6 +61,23 @@ class MacroSolverBase(ABC):
             graph[i].append(i) # waiting at node has 0 transport cost
             cost[i][i] = 0
         return graph, cost
+    
+    def eval_capacity(self, paths):
+        """
+            Evaluate if solution violates node capacity.
+        """
+        num_violation = 0
+        max_violation_percentage = 0
+
+        for t in range(len(paths[0])):
+            current_pos = [path[t] for path in paths]
+            state_count = Counter(current_pos)
+            for state, count in state_count.items():
+                if count > self.node_capacity[state]:
+                    num_violation += 1
+                    violation_percentage = (count-self.node_capacity[state])/self.node_capacity[state]
+                    max_violation_percentage = max (violation_percentage, max_violation_percentage)
+        return num_violation, max_violation_percentage
 
     @abstractmethod
     def init_solver(self, **kwargs):

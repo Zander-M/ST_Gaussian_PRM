@@ -107,12 +107,12 @@ class LPSolver(MacroSolverBase):
             constraints.append(cp.sum(x[goal_indices]) == self.goals_agent_count[i])
 
         # 3. Capacity constraints at intermediate nodes
-        if self.capacity_constraint:
-            for node, cap in enumerate(self.node_capacity):
-                for t in range(len(shortest_paths[0])):
-                    trajs = node_time_to_traj.get((node, t), [])
-                    if trajs:
-                        constraints.append(cp.sum(x[trajs]) <= cap)
+        # if self.capacity_constraint:
+        #     for node, cap in enumerate(self.node_capacity):
+        #         for t in range(len(shortest_paths[0])):
+        #             trajs = node_time_to_traj.get((node, t), [])
+        #             if trajs:
+        #                 constraints.append(cp.sum(x[trajs]) <= cap)
 
         # 4. Optional: x >= 0
         constraints.append(x >= 0)

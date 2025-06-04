@@ -5,9 +5,11 @@
 """
 from collections import defaultdict
 import numpy as np
+from numpy.linalg import cholesky, LinAlgError
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 from scipy.stats import chi2
+from scipy.stats.qmc import PoissonDisk
 
 def sample_gaussian(g_node, num_points, confidence_interval, min_spacing, candidates=None):
 
@@ -37,35 +39,63 @@ def sample_gaussian(g_node, num_points, confidence_interval, min_spacing, candid
         distances = cdist([point], selected)[0]
         if np.all(distances > min_spacing):
             selected.append(point)
+    assert len(selected) == num_points, "Not enough samples in the node"
     return np.array(selected)
 
-def sample_gaussian_unique(g_node, num_points, confidence_interval, min_spacing, candidates=None):
+def sample_gaussian_qmc_poisson(g_node, num_points, confidence_interval=0.95,
+                                 min_spacing=0.1, max_trials=5):
     """
-    Return unique Gaussian samples within the confidence interval and spacing.
-    Over-samples to ensure enough valid, unique samples.
+    Poisson-disk-like sampling in a 2D Gaussian node using QMC PoissonDisk from scipy.
+    
+    Parameters:
+        g_node: object with get_gaussian() -> (mean, cov)
+        num_points: number of samples to draw
+        confidence_interval: chi2 confidence level (default 0.95)
+        min_spacing: approximate min spacing in Mahalanobis space
+        max_trials: retries if not enough samples generated
+    Returns:
+        (num_points, 2) array of Gaussian samples
     """
-    chi2_thresh = chi2.ppf(confidence_interval, 2)
     mean, cov = g_node.get_gaussian()
+    dim = 2
+    try:
+        L = cholesky(cov)
+    except LinAlgError:
+        L = np.eye(2)
 
-    if candidates is None:
-        num_candidates = 10000
-        candidates = np.random.multivariate_normal(mean, cov, num_candidates)
+    # Mahalanobis radius for desired confidence region
+    chi2_thresh = chi2.ppf(confidence_interval, df=dim)
+    scale_radius = np.sqrt(chi2_thresh)  # multiply unit cube to get ellipse
 
-    delta = candidates - mean
-    inv_cov = np.linalg.inv(cov)
-    dists = np.einsum("ni, ij, nj ->n", delta, inv_cov, delta)
-    filtered = candidates[dists <= chi2_thresh]
+    for _ in range(max_trials):
+        # Generate QMC Poisson Disk samples in [0,1]^2
+        engine = PoissonDisk(d=dim, radius=min_spacing / 2.0)  # spacing in unit space
+        raw = engine.random(num_points * 2)  # oversample to ensure enough
 
-    if len(filtered) == 0:
-        return np.zeros((0, mean.shape[0]))
+        if len(raw) < num_points:
+            continue
 
-    selected = [filtered[0]]
-    for point in filtered[1:]:
-        if len(selected) >= num_points:
-            break
-        if np.all(cdist([point], selected)[0] > min_spacing):
-            selected.append(point)
-    return np.array(selected)
+        # Center and scale to [-1, 1]^2
+        samples_unit = (raw - 0.5) * 2
+
+        # Keep only those inside the unit ball (optional stricter filtering)
+        in_ball_mask = np.linalg.norm(samples_unit, axis=1) <= 1.0
+        samples_unit = samples_unit[in_ball_mask]
+
+        if len(samples_unit) < num_points:
+            continue
+
+        samples_unit = samples_unit[:num_points]
+
+        # Map to Mahalanobis ellipse and then to real space
+        samples_maha = samples_unit * scale_radius
+        samples_real = samples_maha @ L.T + mean
+        return samples_real
+
+    # Final fallback (zero samples)
+    print("Warning: QMC Poisson sampling failed to find enough samples.")
+    return np.zeros((0, mean.shape[0]))
+
 
 class EvaluationSolver:
 
@@ -151,6 +181,10 @@ class EvaluationSolver:
         return trajectory
 
     def solve(self):
+        """
+            Calculate per-agent trajectory and solution cost.
+        """
+
         solution = [[] for _ in range(self.num_agents)]
         curr_agent_idx = 0
 

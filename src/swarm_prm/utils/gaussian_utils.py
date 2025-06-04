@@ -142,7 +142,7 @@ class GaussianGraphNode(GaussianNode):
             self.alpha = alpha
             self.radius = radius
 
-    def get_capacity(self, agent_radius, threshold=.3):
+    def get_capacity(self, agent_radius, threshold=.4):
         """
             Compute capacity based on safe area and agent radius.
         """
