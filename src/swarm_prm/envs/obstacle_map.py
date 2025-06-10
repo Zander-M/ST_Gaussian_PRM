@@ -153,7 +153,7 @@ class ObstacleMap:
         return False
 
     def is_gaussian_trajectory_collision(self, start:GaussianNode, goal:GaussianNode,
-                                        num_samples=10, 
+                                        num_samples=20, 
                                         mc_threshold=0.9, 
                                         collision_check_method="CVAR") -> bool:
         """

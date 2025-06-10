@@ -202,10 +202,10 @@ class GaussianPRM:
         """
             Build Gaussian PRM
         """
-        self.sample_free_space(sampling_strategy="CVT", collision_check_method="CVAR") # sample node locations 
-        self.build_roadmap(roadmap_method="TRIANGULATION") # connect sample Gaussian nodes, building roadmap
+        self.sample_free_space(sampling_strategy="CVT") # sample node locations 
+        self.build_roadmap() # connect sample Gaussian nodes, building roadmap
 
-    def sample_free_space(self, sampling_strategy="CVT", collision_check_method="CVAR"):
+    def sample_free_space(self, sampling_strategy="CVT"):
         """
             Sample points on the map uniformly random
             TODO: add Gaussian Sampling perhaps?
@@ -214,50 +214,33 @@ class GaussianPRM:
         config = sampling_config[sampling_strategy]
         self.samples, self.gaussian_nodes = sampling_method(self.obstacle_map, self.num_samples, **config)
 
-    def build_roadmap(self, radius=50, roadmap_method="KDTREE", collision_check_method="CVAR"):
+    def build_roadmap(self, radius=50):
         """
-            Build Roadmap based on samples. Default connect radius is 10
+            Build Roadmap based on samples. Default connect radius is 50
         """
-
         # add start nodes and goal nodes to the graph
-
-        if roadmap_method == "KDTREE":
-            kd_tree = KDTree([(sample[0], sample[1]) for sample in self.samples])
-            for i, node in enumerate(self.samples):
-                indices = kd_tree.query_ball_point(node, radius, 2)
-
-                # Edge must be collision free with the environment
-                edges = [(i, idx) for idx in indices \
-                         if not self.obstacle_map.is_gaussian_trajectory_collision(
-                             self.gaussian_nodes[i],
-                             self.gaussian_nodes[idx],
-                             collision_check_method=collision_check_method)]
-                self.roadmap.extend(edges)
-
-        elif roadmap_method == "TRIANGULATION":
-            boundary_points = self.obstacle_map.get_boundary_points(self.obstacle_map.obstacles, 10)
-            points = np.concat(( self.samples, boundary_points))
-            tri = Delaunay(points)
-            for i, simplex in enumerate(tri.simplices):
-                for i in range(-1, 2):
-                    if  not (boundary_points == points[simplex[i]]).all(1).any()  \
-                        and not (boundary_points == points[simplex[i+1]]).all(1).any()\
-                        and (simplex[i], simplex[i+1]) not in self.roadmap \
-                        and (simplex[i+1], simplex[i]) not in self.roadmap \
-                        and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
-                        and not self.obstacle_map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
-                                                           self.gaussian_nodes[simplex[i+1]].mean) \
-                        and not self.obstacle_map.is_gaussian_trajectory_collision(
-                             self.gaussian_nodes[simplex[i]],
-                             self.gaussian_nodes[simplex[i+1]],
-                             collision_check_method=collision_check_method, num_samples=20):
-                        self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
-                        # Add path cost
-                        g_node1 = self.gaussian_nodes[int(simplex[i])]
-                        g_node2 = self.gaussian_nodes[int(simplex[i+1])]
-                        self.roadmap_cost.append(gaussian_wasserstein_distance(
-                            g_node1.mean, g_node1.covariance,
-                            g_node2.mean, g_node2.covariance))
+        boundary_points = self.obstacle_map.get_boundary_points(self.obstacle_map.obstacles, 10)
+        points = np.concat(( self.samples, boundary_points))
+        tri = Delaunay(points)
+        for i, simplex in enumerate(tri.simplices):
+            for i in range(-1, 2):
+                if  not (boundary_points == points[simplex[i]]).all(1).any()  \
+                    and not (boundary_points == points[simplex[i+1]]).all(1).any()\
+                    and (simplex[i], simplex[i+1]) not in self.roadmap \
+                    and (simplex[i+1], simplex[i]) not in self.roadmap \
+                    and np.linalg.norm(self.samples[simplex[i]]-self.samples[simplex[i+1]]) < radius \
+                    and not self.obstacle_map.is_line_collision(self.gaussian_nodes[simplex[i]].mean, 
+                                                       self.gaussian_nodes[simplex[i+1]].mean) \
+                    and not self.obstacle_map.is_gaussian_trajectory_collision(
+                         self.gaussian_nodes[simplex[i]],
+                         self.gaussian_nodes[simplex[i+1]]):
+                    self.roadmap.append((int(simplex[i]), int(simplex[i+1])))
+                    # Add path cost
+                    g_node1 = self.gaussian_nodes[int(simplex[i])]
+                    g_node2 = self.gaussian_nodes[int(simplex[i+1])]
+                    self.roadmap_cost.append(gaussian_wasserstein_distance(
+                        g_node1.mean, g_node1.covariance,
+                        g_node2.mean, g_node2.covariance))
 
     def get_bounding_polygon(self):
         """

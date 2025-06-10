@@ -1,26 +1,27 @@
 """
-    Min cost flow on Time Expanded Graph. Result from previous timestep is reused
-    to speed up the algorithm.
+    Max Flow on Time Expanded Graph, followed by Min Cost Flow with the found 
+    solution timestep. Result from previous timestep is reused to speed up 
+    the algorithm.
 """
 
-from collections import defaultdict, deque
 import time
+
+from collections import defaultdict, deque
 from swarm_prm.solvers.macro import MacroSolverBase, register_solver
-from swarm_prm.solvers.macro.teg_mcf import MinCostFlow 
+from swarm_prm.solvers.macro.teg_two_step import MaxFlow, MinCostFlow
 
-
-# distinguish nodes
+# node labels 
 
 IN_NODE = 0
 OUT_NODE = 1 
 
-@register_solver("TEGMCFSolver")
-class TEGMCFSolver(MacroSolverBase):
-    def init_solver(self, **kwargs):
-
-        self.flow_constraint = kwargs.get("flow_constraint", []) # treat previous flow as constraints
-
-        self.node_capacity = [node.get_capacity(self.agent_radius) for node in self.gaussian_prm.gaussian_nodes]
+@register_solver("TEGTwoStepSolver")
+class TEGTwoStepSolver(MacroSolverBase):
+    def init_solver(self, **kwargs) -> None:
+        # Flow constraints
+        self.flow_dicts = kwargs.get("flow_dicts", [])
+        self.capacity_dicts = kwargs.get("capacity_dicts", [])
+        self.max_timestep = kwargs.get("max_timestep", 0)
 
     def get_min_timestep(self):
         """
@@ -38,6 +39,47 @@ class TEGMCFSolver(MacroSolverBase):
                 if neighbor not in visited:
                     open_list.append((neighbor, time+1))
         return 0
+    
+    def get_path(self, flow_dict, timestep):
+        """
+            Get individual solution paths
+        """
+        paths = [[] for _ in range(self.num_agents)]
+
+        # Build reverse lookup: where can I go from here?
+        next_moves = defaultdict(list)
+        for u in flow_dict:
+            for v, flow in flow_dict[u].items():
+                if flow > 0:
+                    next_moves[u].extend([v] * flow)
+
+        for agent_id in range(self.num_agents):
+            u = ("SS", None)
+            while u != ("SG", None):
+                v = next_moves[u].pop()
+                if v[0] is not None and v[0] != "SG":
+                    paths[agent_id].append(v[0])
+                u = v
+
+        # padding paths to solution length, agent waits at goal
+        for i in range(self.num_agents):
+            if not paths[i]:
+                raise RuntimeError(f"Agent {i} has no valid path.")
+            goal = paths[i][-1]
+            pad_len = timestep - len(paths[i])
+            paths[i].extend([goal] * pad_len)
+        return paths
+
+    def get_cost(self, paths):
+        """
+            Get average cost per agent. We use Wasserstein distance between states
+            as an estimator.
+        """
+        cost = 0
+        for path in paths:
+            for u, v in zip(path[:-1], path[1:]):
+                cost += self.cost_dict[u][v]
+        return cost / len(paths)
 
     def build_teg(self, timestep):
         """
@@ -49,17 +91,36 @@ class TEGMCFSolver(MacroSolverBase):
 
         # Adding super source and super goal to the graph
         for i, start_idx in enumerate(self.starts_idx):
-            teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i] 
+            teg[super_source][(start_idx, 0, IN_NODE)] = self.starts_agent_count[i]
             teg[(start_idx, 0, IN_NODE)][(start_idx, 0, OUT_NODE)] = self.node_capacity[start_idx]
 
         for i, goal_idx in enumerate(self.goals_idx):
             teg[(goal_idx, timestep, OUT_NODE)][super_sink] = self.goals_agent_count[i]
-                    # adding graph edges
+
+        # adding graph edges
         for t in range(timestep):
             for u in self.roadmap:
+
+                # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
+                teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]  
+                for capacity_dict in self.capacity_dicts:
+                    teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] -= capacity_dict[u, t+1]
+
+                # Edge between states
                 for v in self.roadmap[u]:
-                    teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
-                    teg[(v, t+1, IN_NODE)][(v, t+1, OUT_NODE)] = self.node_capacity[v]
+                    # check if inverse edge between different nodes exists. Edge Constraint
+                    if (u != v):
+                        edge_exists = False
+                        for flow_dict in self.flow_dicts:
+                            if (v, t) in flow_dict and (u, t+1) in flow_dict[(v, t)]:
+                                # print("edge_exist!") # TESTT
+                                edge_exists = True
+                                break
+                        if not edge_exists:
+                            teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
+                    else: # wait edges
+                        teg[(u, t, OUT_NODE)][(v, t+1, IN_NODE)] = float("inf")
+
         return super_source, super_sink, teg 
     
     def build_residual_graph_cost_graph(self, teg):
@@ -135,35 +196,67 @@ class TEGMCFSolver(MacroSolverBase):
             del cost_graph[(goal_idx, timestep-1, OUT_NODE)][super_sink]
             del cost_graph[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
-    def get_solution(self):
+    def solve(self):
         """
-            Find Minimum Cost Flow within the available time
+            Find earliest timestep such that the graph reaches target flow
         """
-        # start from minimum path lengh between start and goal
-        start_time = time.time()
-        timestep = self.get_min_timestep()
+
+        # Construct solution that is at least as long as the existing solutions. 
+        timestep = max(self.get_min_timestep(), self.max_timestep)
         max_flow = 0
-        cost = 0
 
         super_source, super_sink, teg = self.build_teg(timestep)
         residual_graph, cost_graph = self.build_residual_graph_cost_graph(teg)
 
+        start_time = time.time()
         while time.time() - start_time < self.time_limit:
-            max_flow, residual_graph, cost = MinCostFlow(super_source, super_sink, 
-                                    residual_graph, cost_graph, self.flow_constraint, 
-                                    initial_flow=max_flow, initial_cost=cost).solve()
-            if timestep % 100 == 0:
-                print("Time step: ", timestep, "Max Flow: ", max_flow, "Cost: ", cost) 
+            max_flow, residual_graph = MaxFlow(super_source, super_sink, 
+                                    residual_graph=residual_graph, initial_flow=max_flow).solve()
+
+            # Solution Found
+            if max_flow == self.num_agents:
+
+                flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
+                capacity_dict = self._flow_to_capacity(flow_dict)
+                paths = self.get_path(flow_dict, timestep)
+                cost = self.get_cost(paths)
+                print("before min cost flow", cost)
+                # Reduce solution flow cost
+                print(len(residual_graph))
+                min_cost_start_time = time.time()
+                residual_graph, cost_reduction= MinCostFlow(residual_graph=residual_graph, cost_graph=cost_graph).solve()
+                min_cost_time = time.time() - min_cost_start_time
+                print("min cost solution time: ", min_cost_time)
+                print("cost reduction: ", cost_reduction)
+
+                flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
+                capacity_dict = self._flow_to_capacity(flow_dict)
+                paths = self.get_path(flow_dict, timestep)
+                cost = self.get_cost(paths)
+                print("after min cost flow", cost)
+                return {
+                    "timestep": timestep, 
+                    "g_nodes": self.gaussian_prm.gaussian_nodes,
+                    "starts_idx": self.starts_idx,
+                    "goals_idx": self.goals_idx,
+                    "paths": paths,
+                    "cost" : cost,
+                    "flow_dict": flow_dict, 
+                    "capacity_dict":capacity_dict, 
+                    "success": True
+                    }
+
             timestep += 1
             self.update_residual_graph_cost_graph(teg, residual_graph, cost_graph, timestep, super_sink)
-        flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-        return timestep, flow_dict, residual_graph
+        print("Timelimit Exceeded.")
+        return {"success": False} 
     
     def _residual_to_flow(self, teg, residual):
         """
             Construct forward flow graph from residual graph
         """
         flow_dict = defaultdict(dict)
+        
         for u in teg:
             # we only look at out-node - in-node edges
             if u[-1] == OUT_NODE:
@@ -171,4 +264,19 @@ class TEGMCFSolver(MacroSolverBase):
                     flow = residual[v][u]
                     if flow > 0:
                             flow_dict[(u[0], u[1])][(v[0], v[1])] = flow
+            
         return flow_dict
+    
+    def _flow_to_capacity(self, flow_dict):
+        """
+            Construct capacity dict indexed by (node, timestep), representing available flow
+        """
+        capacity_dict = defaultdict(lambda:0)
+        for u in flow_dict:
+            if u == ("SS", None):
+                continue
+            for v in flow_dict[u]:
+                if v == ("SG", None):
+                    continue
+                capacity_dict[v] += flow_dict[u][v]
+        return capacity_dict
