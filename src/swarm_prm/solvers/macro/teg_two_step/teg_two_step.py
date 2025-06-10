@@ -216,20 +216,21 @@ class TEGTwoStepSolver(MacroSolverBase):
             # Solution Found
             if max_flow == self.num_agents:
 
-                flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
-                capacity_dict = self._flow_to_capacity(flow_dict)
-                paths = self.get_path(flow_dict, timestep)
-                cost = self.get_cost(paths)
-                print("before min cost flow", cost)
                 # Reduce solution flow cost
-                print(len(residual_graph))
-                min_cost_start_time = time.time()
-                residual_graph, cost_reduction= MinCostFlow(residual_graph=residual_graph, cost_graph=cost_graph).solve()
-                min_cost_time = time.time() - min_cost_start_time
-                print("min cost solution time: ", min_cost_time)
-                print("cost reduction: ", cost_reduction)
+                ss, sg, teg = self.build_teg(timestep)
+                _, cost_graph = self.build_residual_graph_cost_graph(teg)
+                flow_dict, cost_reduction= MinCostFlow(teg, 
+                                                       cost_graph,
+                                                       ss,
+                                                       sg,
+                                                       self.num_agents
+                                                       ).solve()
+                # import pprint
+                # pprint.pprint(flow_dict)
+                # print(flow_dict.keys())
+                # assert False
 
-                flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
+                # flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
                 capacity_dict = self._flow_to_capacity(flow_dict)
                 paths = self.get_path(flow_dict, timestep)
                 cost = self.get_cost(paths)
