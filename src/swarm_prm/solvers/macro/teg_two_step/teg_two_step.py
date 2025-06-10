@@ -216,25 +216,25 @@ class TEGTwoStepSolver(MacroSolverBase):
             # Solution Found
             if max_flow == self.num_agents:
 
+                flow_dict = self._residual_to_flow(teg, residual_graph)
+                paths = self.get_path(flow_dict, timestep)
+                cost = self.get_cost(paths)
+                print("Initial flow cost: ", cost)
+
                 # Reduce solution flow cost
                 ss, sg, teg = self.build_teg(timestep)
                 _, cost_graph = self.build_residual_graph_cost_graph(teg)
-                flow_dict, cost_reduction= MinCostFlow(teg, 
-                                                       cost_graph,
-                                                       ss,
-                                                       sg,
-                                                       self.num_agents
-                                                       ).solve()
-                # import pprint
-                # pprint.pprint(flow_dict)
-                # print(flow_dict.keys())
-                # assert False
+                flow_dict = MinCostFlow(teg, 
+                                        cost_graph,
+                                        ss,
+                                        sg,
+                                        self.num_agents
+                                        ).solve()
 
-                # flow_dict = self._residual_to_flow(teg, residual_graph) # remove residual graph edges
                 capacity_dict = self._flow_to_capacity(flow_dict)
                 paths = self.get_path(flow_dict, timestep)
                 cost = self.get_cost(paths)
-                print("after min cost flow", cost)
+                print("Optimized flow cost: ", cost)
                 return {
                     "timestep": timestep, 
                     "g_nodes": self.gaussian_prm.gaussian_nodes,

@@ -185,11 +185,10 @@ class EvaluationSolver:
         """
             Calculate per-agent trajectory and solution cost.
         """
-
         solution = [[] for _ in range(self.num_agents)]
         curr_agent_idx = 0
 
-        # Step 1: assign agents to start samples
+        # Assign agents to start samples
         for i, start_idx in enumerate(self.starts_idx):
             if self.starts_agent_count[i] == 0:
                 continue
@@ -200,7 +199,7 @@ class EvaluationSolver:
                 solution[curr_agent_idx].append(s)
                 curr_agent_idx += 1
 
-        # Step 2: step through macro flow
+        # Step through macro flow
         for t in range(self.timestep + 1):
             new_node_agents = defaultdict(list)
 
