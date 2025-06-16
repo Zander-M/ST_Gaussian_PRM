@@ -100,11 +100,28 @@ def create_random_planning_instance(instance_config):
     starts_idx_set = gaussian_prm.get_node_index(start_regions)
     goals_idx_set = gaussian_prm.get_node_index(goal_regions)
 
-    starts_idx = np.random.choice(starts_idx_set, instance_config["num_starts"], replace=False)
-    goals_idx = np.random.choice(goals_idx_set, instance_config["num_goals"], replace=False)
+    # Sample starts and goals.
+    # Resample if capacity is smaller than num_agents.
 
+    starts_idx = np.random.choice(starts_idx_set, instance_config["num_starts"], replace=False)
     starts_idx = [starts_idx] if instance_config["num_starts"] == 1 else starts_idx.tolist() # type:ignore
+    start_capacity = np.sum([gaussian_prm.gaussian_nodes[idx].get_capacity(instance_config["agent_radius"]) 
+                             for idx in starts_idx])
+    while start_capacity < instance_config["num_agents"]:
+        starts_idx = np.random.choice(starts_idx_set, instance_config["num_starts"], replace=False)
+        starts_idx = [starts_idx] if instance_config["num_starts"] == 1 else starts_idx.tolist() # type:ignore
+        start_capacity = np.sum([gaussian_prm.gaussian_nodes[idx].get_capacity(instance_config["agent_radius"]) 
+                                 for idx in starts_idx])
+
+    goals_idx = np.random.choice(goals_idx_set, instance_config["num_goals"], replace=False)
     goals_idx = [goals_idx] if instance_config["num_goals"] == 1 else goals_idx.tolist()     # type:ignore
+    goal_capacity = np.sum([gaussian_prm.gaussian_nodes[idx].get_capacity(instance_config["agent_radius"]) 
+                             for idx in goals_idx])
+    while goal_capacity < instance_config["num_agents"]:
+        goals_idx = np.random.choice(starts_idx_set, instance_config["num_starts"], replace=False)
+        goals_idx = [starts_idx] if instance_config["num_starts"] == 1 else starts_idx.tolist() # type:ignore
+        goal_capacity = np.sum([gaussian_prm.gaussian_nodes[idx].get_capacity(instance_config["agent_radius"]) 
+                                 for idx in goals_idx])
 
     # Create weight pool
     starts_pool = []

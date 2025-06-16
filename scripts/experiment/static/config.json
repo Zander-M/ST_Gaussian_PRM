@@ -1,13 +1,13 @@
 {
     "experiment_config": {
             "time_limit": 180,
-            "num_tries": 100,
-            "num_agents": [50, 100, 200]
+            "num_tries": 10,
+            "num_agents": [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
     },
     "env_configs": [
         {
             "map_type": "corridor",
-            "num_samples": 200, 
+            "num_samples": 200,
             "agent_radius": 0.2,
             "start_regions": [
                 [[0, 30], [0, 0], [30, 0], [30, 30]],
@@ -17,8 +17,8 @@
                 [[70, 100], [70, 70], [100, 70], [100, 100]],
                 [[70, 30], [70, 0], [100, 0], [100, 30]]
             ],
-            "num_starts": 3,
-            "num_goals": 3
+            "num_starts": 12,
+            "num_goals": 12
         },
         {
             "map_type": "swarm",
@@ -32,8 +32,8 @@
                 [[170, 160], [170, 110], [200, 110], [200, 160]],
                 [[170, 40], [170, 0], [200, 0], [200, 40]]
             ],
-            "num_starts": 8,
-            "num_goals": 8
+            "num_starts": 12,
+            "num_goals": 12
         },
         {
             "map_type": "obstacle",
@@ -47,8 +47,8 @@
                 [[170, 160], [170, 110], [200, 110], [200, 160]],
                 [[170, 40], [170, 0], [200, 0], [200, 40]]
             ],
-            "num_starts": 8,
-            "num_goals": 8
+            "num_starts": 12,
+            "num_goals": 12
         }
     ], 
 

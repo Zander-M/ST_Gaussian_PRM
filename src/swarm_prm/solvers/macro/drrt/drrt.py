@@ -148,12 +148,15 @@ class DRRTSolver(MacroSolverBase):
                 Od_time += Od_t
                 verify_time += v_t
             if self.goal_state in self.visited_states:
-                path = self.connect_to_target(self.goal_state)
+                paths = self.connect_to_target(self.goal_state)
                 print("Found solution")
                 return {
                     "success": True,
-                    "path": path,
-                    "timestep": len(path),
+                    "paths": paths,
+                    "g_nodes": self.gaussian_prm.gaussian_nodes,
+                    "starts_idx": self.starts_idx,
+                    "goals_idx": self.goals_idx,
+                    "timestep": len(paths),
                     "cost": self.cost
                 }
             if iteration % 1000 == 0:
