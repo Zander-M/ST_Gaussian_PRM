@@ -10,12 +10,6 @@ from shapely.geometry import Polygon, box, LinearRing
 from scipy.spatial import HalfspaceIntersection, ConvexHull
 
 from pydrake.all import (
-    SceneGraph,
-    DiagramBuilder,
-    RigidTransform,
-    Box as DrakeBox,
-    GeometryInstance,
-    GeometrySet,
     HPolyhedron,
     VPolytope,
     IrisOptions,
@@ -33,8 +27,8 @@ class IrisSampler:
             Sample one random point on the Gaussian PRM
         """
         return self.run_iris_with_shapely(sample, self.obstacles, 
-                                          [[0, self.width],
-                                           [0, self.height]])
+                                          np.array([[0, self.width],[0, self.height]], dtype=np.float64)
+                                          )
         
     def ensure_ccw(self, polygon):
         ring = LinearRing(polygon.exterior.coords)
@@ -48,8 +42,8 @@ class IrisSampler:
         Convert a shapely polygon into a padded AABB box as a ConvexSet (HPolyhedron).
         """
         minx, miny, maxx, maxy = polygon.bounds
-        lb = np.array([[minx - buffer], [miny - buffer]])
-        ub = np.array([[maxx + buffer], [maxy + buffer]])
+        lb = np.array([[minx - buffer], [miny - buffer]], dtype=np.float64)
+        ub = np.array([[maxx + buffer], [maxy + buffer]], dtype=np.float64)
         return HPolyhedron.MakeBox(lb, ub)
 
     def chebyshev_center(self, A, b):
@@ -57,6 +51,9 @@ class IrisSampler:
         Compute Chebyshev center of polytope Ax <= b.
         Returns a point strictly inside the region.
         """
+
+        A = A.astype(np.float64)
+        b = b.astype(np.float64)
         dim = A.shape[1]
         x = cp.Variable(dim)
         r = cp.Variable(1)
@@ -79,7 +76,7 @@ class IrisSampler:
             raise RuntimeError("Failed to compute Chebyshev center.")
 
         # Flatten interior point to shape (2,) for scipy
-        interior_point = np.array(center[0]).flatten()
+        interior_point = np.array(center[0], dtype=np.float64).flatten()
 
         # Convert Ax <= b to scipy format: [a1, a2, -b]
         halfspaces = np.hstack([A, -b.reshape(-1, 1)])
@@ -95,7 +92,7 @@ class IrisSampler:
             Convert a convex Shapely polygon to a Drake HPolyhedron
         """
         polygon = self.ensure_ccw(polygon)
-        coords = np.array(polygon.exterior.coords[:-1])
+        coords = np.array(polygon.exterior.coords[:-1], dtype=np.float64)
         num_edges = len(coords)
         A = []
         b = []
@@ -103,15 +100,15 @@ class IrisSampler:
             p1 = coords[i]
             p2 = coords[(i+1) % num_edges]
             edge = p2 - p1
-            normal = np.array([-edge[1], edge[0]])
+            normal = np.array([-edge[1], edge[0]], dtype=np.float64)
             normal = normal / np.linalg.norm(normal)
             offset = np.dot(normal, p1)
 
             A.append(normal)
             b.append(offset)
 
-        A = np.array(A)
-        b = np.array(b)
+        A = np.array(A, dtype=np.float64)
+        b = np.array(b, dtype=np.float64)
         return HPolyhedron(A, b)
 
     def shapely_polygon_to_vpolytope(self, polygon: Polygon) -> VPolytope:
@@ -122,7 +119,7 @@ class IrisSampler:
             raise ValueError("Polygon must be convex to use with VPolytope.")
 
         # Extract exterior coordinates (drop duplicate last point)
-        coords = np.array(polygon.exterior.coords[:-1]).T  # shape: (2, N)
+        coords = np.array(polygon.exterior.coords[:-1], dtype=np.float64).T  # shape: (2, N)
         return VPolytope(coords)
 
     def run_iris_with_shapely(self, seed_point, obstacles, bounds=[[-100, 100], [-100, 100]]):
@@ -141,7 +138,7 @@ class IrisSampler:
                 geom_ids.append(geom_id)
 
         # Define domain bounds as HPolyhedron
-        bounds_np = np.array(bounds)
+        bounds_np = np.array(bounds, dtype=np.float64)
         lb = bounds_np[:, 0:1]
         ub = bounds_np[:, 1:2]
         domain = HPolyhedron.MakeBox(lb, ub)
@@ -154,10 +151,9 @@ class IrisSampler:
         region = Iris(
             domain=domain,
             obstacles=geom_ids,
-            sample=np.array(seed_point),
+            sample=np.array(seed_point, dtype=np.float64).T,
             options=options
         )
-
         return self.iris_hpoly_to_polygon(region)
 
 
