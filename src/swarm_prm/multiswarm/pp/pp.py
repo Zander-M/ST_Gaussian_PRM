@@ -16,7 +16,6 @@ class PrioritizedPlannng:
             Update flow constraint
         """
 
-
     def plan(self):
         """
             Sequentially plan for each instance.
