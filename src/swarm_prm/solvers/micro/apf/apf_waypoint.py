@@ -15,25 +15,22 @@ from shapely.ops import nearest_points
 from swarm_prm.utils.spatial_hash import SpatialHash
 
 class APFWaypointSolver:
-    def __init__(self, roadmap, macro_solution, agent_radius, 
-                 velocity_cap=1.0, obs_thresh=1, 
-                 attract_coeff=0.2, repel_coeff=0.5, agent_repel_coeff=0.5,  
-                 max_timestep_iter=100, reach_dist=3, step_size=1.0):
+    def __init__(self, roadmap, macro_solution, agent_radius, **apf_config):
 
         self.roadmap = roadmap # for getting obstacles only
         self.macro_solution = macro_solution
         self.agent_radius = agent_radius
         self.num_agent = len(self.macro_solution)
-        self.max_timestep_iter = max_timestep_iter # number of steps to make per state transition
-        self.reach_dist = reach_dist # reach threshold
+        self.max_timestep_iter = apf_config.get("max_timestep_iter", 100)# number of steps to make per state transition
+        self.reach_dist = apf_config.get("reach_dist", 3)# reach threshold
         
         # APF parameters 
-        self.agent_repel_coeff = agent_repel_coeff
-        self.attract_coeff = attract_coeff
-        self.obs_thresh = obs_thresh
-        self.repel_coeff = repel_coeff
-        self.step_size = step_size
-        self.velocity_cap = velocity_cap
+        self.agent_repel_coeff = apf_config.get("agent_repel_coeff", 0.5) 
+        self.attract_coeff = apf_config.get("attract_coeff", 0.2)
+        self.obs_thresh = apf_config.get("obs_thresh", 1) 
+        self.repel_coeff = apf_config.get("repel_coeff", 0.5)
+        self.step_size = apf_config.get("step_size", 1.0) 
+        self.velocity_cap = apf_config.get("velocity_cap", 1.0)
 
         self.solution_trajectory = [[] for _ in range(self.num_agent)]
         self.solution_length = 0
@@ -115,6 +112,12 @@ class APFWaypointSolver:
         if timestep_iter == self.max_timestep_iter * self.num_agent:
             return False 
         return True
+    
+    def reach_state_check(self):
+        """
+            Check if state is reached.
+            TODO: implement this
+        """
         
     def get_solution(self):
         """
