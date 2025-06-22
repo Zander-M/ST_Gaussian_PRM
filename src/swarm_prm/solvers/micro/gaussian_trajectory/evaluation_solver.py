@@ -4,10 +4,12 @@
     macro solution indicies.
 """
 from collections import defaultdict
+
 import numpy as np
-from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
+from scipy.spatial.distance import cdist
 from scipy.stats import chi2
+
 
 def sample_gaussian(g_node, num_points, confidence_interval, min_spacing, candidates=None):
 

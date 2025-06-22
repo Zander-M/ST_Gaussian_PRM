@@ -107,7 +107,7 @@ class FormationControlSovler(MacroSolverBase):
         if self.gaussian_prm.obstacle_map.is_point_collision((x, y)):
             x = np.random.randint(0, self.gaussian_prm.obstacle_map.width)
             y = np.random.randint(0, self.gaussian_prm.obstacle_map.height)
-        return np.array([x, y])
+        return np.array([x, y], dtype=np.float64)
     
     def check_connection(self, poly1, poly2):
         """
