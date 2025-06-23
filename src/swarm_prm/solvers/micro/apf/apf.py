@@ -36,7 +36,7 @@ class APF:
         """
         positions = np.array([path[t] for path in self.solution_paths])
         goals = np.array([path[t+1] for path in self.solution_paths])
-        trajectories = np.empty_like(positions) 
+        trajectories = [] 
         reached_goal = False
         while not reached_goal:
             dists_to_goals = np.linalg.norm(positions - goals, axis=1)
@@ -46,9 +46,13 @@ class APF:
                 forces = self.compute_apf_forces(positions, goals)
                 step = self.step_size * forces
                 norm = np.linalg.norm(step)
-                step = np.min(self.max_step * step / norm)
-                trajectories = np.vstack((trajectories, positions))
+                scaling = np.minimum(1.0, self.max_step / norm)
+                step = step * scaling
+                # step = np.min(self.max_step * step / norm)
+                trajectories.append(np.copy(positions))
                 positions += self.damping*step
+        trajectories = np.stack(trajectories, axis=1)
+        print(trajectories.shape)
         return trajectories
 
     def compute_apf_forces(self, pos, goals):
@@ -105,9 +109,6 @@ if __name__ == "__main__":
     paths = np.einsum("ijk->jik", samples)
 
     print("paths", paths.shape)
-
-    trajectories = APF(paths).solve()
-
     apf_config = {
-
     }
+    trajectories = APF(paths, **apf_config).solve()
