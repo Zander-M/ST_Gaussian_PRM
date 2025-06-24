@@ -13,12 +13,13 @@ class APF:
     """
         APF planner
     """
-    def __init__(self, solution_paths, **apf_config):
+    def __init__(self, gaussian_paths, gaussian_nodes, **apf_config):
         
         # APF parameters
-        self.solution_paths = solution_paths
-        self.num_agents = len(solution_paths)
-        self.goal_tolerance = apf_config.get("goal_tolerance", 0.001)
+        self.gaussian_paths = gaussian_paths 
+        self.num_agents = len(gaussian_paths)
+        self.gaussian_nodes = gaussian_nodes
+        self.goal_chisq_threshold= apf_config.get("goal_chisq_threshold", 5.991)
         self.step_size = apf_config.get("step_size", 0.05)
         self.k_attr = apf_config.get("k_attr", 1.0)
         self.k_rep = apf_config.get("k_rep", 0.0002)
@@ -28,22 +29,25 @@ class APF:
         self.max_step = apf_config.get("max_step", 0.07)
         self.damping = apf_config.get("damping", 0.7)
 
-    def update(self, t):
+    def update(self, t, positions):
         """
-            Update trajectories for one uniform timestep
-            Return 
-            TODO: implement this
+            Update trajectories for one uniform timestep using soft Gaussian
+            attractive force.
+            Return APF waypoints.
         """
-        positions = np.array([path[t] for path in self.solution_paths])
-        goals = np.array([path[t+1] for path in self.solution_paths])
+        goals_gaussians = [self.gaussian_nodes[path[t+1]] for path in self.gaussian_paths]
+        goals_mean = np.array([goals_gaussian.mean for goals_gaussian in goals_gaussians])
+        goals_cov = np.array([goals_gaussian.cov for goals_gaussian in goals_gaussians])
+        inv_cov = np.linalg.inv(goals_cov)
         trajectories = [] 
         reached_goal = False
         while not reached_goal:
-            dists_to_goals = np.linalg.norm(positions - goals, axis=1)
-            if np.any(dists_to_goals < self.goal_tolerance):
+            diff = positions - goals_mean
+            mahalanobis_sq = np.einsum("ni,nij,nj->n", diff, inv_cov, diff)
+            if np.all(mahalanobis_sq < self.goal_chisq_threshold):
                 reached_goal = True
             else: 
-                forces = self.compute_apf_forces(positions, goals)
+                forces = self.compute_apf_forces(positions, goals_gaussians)
                 step = self.step_size * forces
                 norm = np.linalg.norm(step)
                 scaling = np.minimum(1.0, self.max_step / norm)
@@ -53,14 +57,16 @@ class APF:
                 positions += self.damping*step
         trajectories = np.stack(trajectories, axis=1)
         print(trajectories.shape)
-        return trajectories
 
-    def compute_apf_forces(self, pos, goals):
+        return trajectories[:, 1:, :]
+
+    def compute_apf_forces(self, pos, gaussian_goals):
         forces = np.zeros_like(pos)
         for i in range(len(pos)):
             # Attractive force
-            goal_diff = goals[i] - pos[i]
-            f_attr = self.k_attr * goal_diff
+            mean_diff = gaussian_goals[i].mean - pos[i]
+            Sigma_inv = np.linalg.inv(gaussian_goals[i].cov)
+            f_attr = self.k_attr * (Sigma_inv @ mean_diff)
 
             # Repulsice force from other agents
             f_rep = np.zeros(2)
@@ -85,9 +91,15 @@ class APF:
             TODO: implement this
         """
         segments = []
-        for t in range(len(self.solution_paths[0])-1):
-            trajectories = self.update(t)
+        # initialize a random config
+        initial_gaussian = self.gaussian_nodes[0]
+        positions = np.random.multivariate_normal(mean=initial_gaussian.mean, 
+                                                  cov=initial_gaussian.cov, 
+                                                  size=self.num_agents)
+        for t in range(len(self.gaussian_paths[0])-1):
+            trajectories = self.update(t, positions)
             segments.append(trajectories)
+            positions = trajectories[:, -1, :]
         return segments
 
 if __name__ == "__main__":
