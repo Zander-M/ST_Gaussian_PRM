@@ -1,5 +1,5 @@
 """
-    Single agent experiments
+    Single agent with dynamic obstacles
 """
 
 import argparse
@@ -26,7 +26,6 @@ def run_solver(instance_config):
     """
         Run Experiment
     """
-
     # Stats
 
     num_success = 0
@@ -74,8 +73,6 @@ def load_config(config_path):
     config = {}
     with open(config_path, "r") as f:
        config = json.load(f)
-    # import pprint
-    # pprint.pprint(config)
     return config
     
 def create_result_folder(output_dir):
@@ -145,7 +142,6 @@ def create_random_planning_instance(instance_config):
         goals_agent_count.append(count)
     return starts_idx, starts_agent_count, goals_idx, goals_agent_count, num_agents
 
-
 def run_experiment(config, result_path):
     """
         Compare performance of algorithms on different instances
@@ -206,7 +202,7 @@ def run_experiment(config, result_path):
     return csv_path
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Gaussian PRM makespan experiment.")
+    parser = argparse.ArgumentParser(description="Gaussian PRM dynamic obstacle experiment.")
     parser.add_argument(
         "--config",
         type=str,
@@ -235,5 +231,3 @@ if __name__ == "__main__":
     config = load_config(args.config)
     result_path = run_experiment(config, result_path)
     # plot_result(result_path, args.show_fig)
-
-    
