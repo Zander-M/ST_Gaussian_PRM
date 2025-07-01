@@ -234,12 +234,6 @@ class ObstacleMap:
                 ax.fill(x, y, fc="black")
         return fig, ax
 
-    def get_openfoam_config(self):
-        """
-            TODO: Convert current map to openfoam initial conditions
-        """
-        pass
-
 ##### Obstacles #####
 
 class Obstacle:
