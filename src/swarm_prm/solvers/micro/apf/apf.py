@@ -15,11 +15,11 @@ class APF:
     """
     def __init__(self, gaussian_paths, gaussian_nodes, **apf_config):
         
-        # APF parameters
+        # APF parameters. Decided by experiment
         self.gaussian_paths = gaussian_paths 
         self.num_agents = len(gaussian_paths)
         self.gaussian_nodes = gaussian_nodes
-        self.goal_chisq_threshold= apf_config.get("goal_chisq_threshold", 5.991)
+        self.goal_chisq_threshold= apf_config.get("goal_chisq_threshold", 5.991) # for 95% CI
         self.step_size = apf_config.get("step_size", 0.05)
         self.k_attr = apf_config.get("k_attr", 1.0)
         self.k_rep = apf_config.get("k_rep", 0.0002)
@@ -37,7 +37,7 @@ class APF:
         """
         goals_gaussians = [self.gaussian_nodes[path[t+1]] for path in self.gaussian_paths]
         goals_mean = np.array([goals_gaussian.mean for goals_gaussian in goals_gaussians])
-        goals_cov = np.array([goals_gaussian.cov for goals_gaussian in goals_gaussians])
+        goals_cov = np.array([goals_gaussian.covariance for goals_gaussian in goals_gaussians])
         inv_cov = np.linalg.inv(goals_cov)
         trajectories = [] 
         reached_goal = False
@@ -56,8 +56,7 @@ class APF:
                 trajectories.append(np.copy(positions))
                 positions += self.damping*step
         trajectories = np.stack(trajectories, axis=1)
-        print(trajectories.shape)
-
+        print(trajectories.shape) 
         return trajectories[:, 1:, :]
 
     def compute_apf_forces(self, pos, gaussian_goals):
@@ -65,7 +64,7 @@ class APF:
         for i in range(len(pos)):
             # Attractive force
             mean_diff = gaussian_goals[i].mean - pos[i]
-            Sigma_inv = np.linalg.inv(gaussian_goals[i].cov)
+            Sigma_inv = np.linalg.inv(gaussian_goals[i].covariance)
             f_attr = self.k_attr * (Sigma_inv @ mean_diff)
 
             # Repulsice force from other agents
@@ -88,19 +87,19 @@ class APF:
     def solve(self):
         """
             Find trajectories across the map
-            TODO: implement this
         """
         segments = []
-        # initialize a random config
-        initial_gaussian = self.gaussian_nodes[0]
-        positions = np.random.multivariate_normal(mean=initial_gaussian.mean, 
-                                                  cov=initial_gaussian.cov, 
-                                                  size=self.num_agents)
+
+        # initialize randomly
+        start_gaussians = [self.gaussian_nodes[gaussian_path[0]] for gaussian_path in self.gaussian_paths]
+        positions = np.vstack([np.random.multivariate_normal(mean=g_node.mean, cov=g_node.covariance)
+                     for g_node in start_gaussians])
+        
         for t in range(len(self.gaussian_paths[0])-1):
             trajectories = self.update(t, positions)
             segments.append(trajectories)
             positions = trajectories[:, -1, :]
-        return segments
+        return np.concatenate(segments, axis=1)
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
