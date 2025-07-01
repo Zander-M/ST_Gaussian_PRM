@@ -20,9 +20,14 @@ class TEGSolver(MacroSolverBase):
     def init_solver(self, **kwargs) -> None:
         # Flow constraints
         self.flow_dicts = kwargs.get("flow_dicts", [])
-        self.capacity_dicts = kwargs.get("capacity_dicts", [])
-        self.obstacle_goal_states = kwargs.get("obstacle_goal_states", {})
         self.max_timestep = kwargs.get("max_timestep", 0)
+
+        # for managing capacity dicts. Swarms should not use nodes used by other swarms
+        self.capacity_dicts = kwargs.get("capacity_dicts", [])
+
+        # for goal state handling. If a dynamic obstacle / another swarm occupies 
+        # certain nodes as goal states, future TEG should not include those nodes.
+        self.obstacle_goal_dicts = kwargs.get("obstacle_goal_dicts", [])
 
     def get_min_timestep(self):
         """
@@ -104,8 +109,16 @@ class TEGSolver(MacroSolverBase):
 
                 # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
                 teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]  
-                for capacity_dict in self.capacity_dicts: # Avoid sharing node between swarms
+
+                # Avoid sharing node between swarms
+                for capacity_dict in self.capacity_dicts: 
                     if (u, t+1) in capacity_dict:
+                        teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = 0
+                        break
+
+                # Avoid dynamic obstacle/swarm goal states
+                for obstacle_goal_dict in self.obstacle_goal_dicts: 
+                    if u in obstacle_goal_dict and t+1 > obstacle_goal_dict[u]:
                         teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = 0
                         break
 
@@ -116,7 +129,6 @@ class TEGSolver(MacroSolverBase):
                         edge_exists = False
                         for flow_dict in self.flow_dicts:
                             if (v, t) in flow_dict and (u, t+1) in flow_dict[(v, t)]:
-                                # print("edge_exist!") # TESTT
                                 edge_exists = True
                                 break
                         if not edge_exists:
@@ -151,6 +163,7 @@ class TEGSolver(MacroSolverBase):
     def update_residual_graph_cost_graph(self, teg, residual_graph, cost_graph, timestep, super_sink):
         """
             Update Residual Graph and Cost Graph for one timestep from previous timestep 
+            TODO: exclude dynamic obstacle edges
         """
         ### TEG
         # update edges to super sink
@@ -162,15 +175,26 @@ class TEGSolver(MacroSolverBase):
         for u in self.roadmap:
             for v in self.roadmap[u]:
                 teg[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
-                teg[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = \
-                    self.node_capacity[v]
+                
+                is_obstacle_goal = False
+                for obstacle_goal_dict in self.obstacle_goal_dicts:
+                    if v in obstacle_goal_dict and obstacle_goal_dict[v] <= timestep:
+                        is_obstacle_goal = True
+                        break
+                teg[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = 0 if is_obstacle_goal else self.node_capacity[v]
+
         ### Residual Dict
         # update edges
         for u in self.roadmap:
             for v in self.roadmap[u]:
                 residual_graph[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = float("inf")
                 residual_graph[(v, timestep, IN_NODE)][(u, timestep-1, OUT_NODE)] = 0 
-                residual_graph[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = self.node_capacity[v]
+                is_obstacle_goal = False
+                for obstacle_goal_dict in self.obstacle_goal_dicts:
+                    if v in obstacle_goal_dict and obstacle_goal_dict[v] <= timestep:
+                        is_obstacle_goal = True
+                        break
+                residual_graph[(v, timestep, IN_NODE)][(v, timestep, OUT_NODE)] = 0 if is_obstacle_goal else self.node_capacity[v]
                 residual_graph[(v, timestep, OUT_NODE)][(v, timestep, IN_NODE)] = 0
 
                 cost_graph[(u, timestep-1, OUT_NODE)][(v, timestep, IN_NODE)] = self.cost_dict[u][v] 
@@ -179,6 +203,7 @@ class TEGSolver(MacroSolverBase):
                 cost_graph[(v, timestep, OUT_NODE)][(v, timestep, IN_NODE)] = 0
 
         # update goals. Preserve flow from previous residual flow
+        # BE CAREFUL, WE ASSUME GOAL STATES ARE DISJOINT FOR DIFFERNT SWARM
         for i, goal_idx in enumerate(self.goals_idx):
             flow = residual_graph[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
