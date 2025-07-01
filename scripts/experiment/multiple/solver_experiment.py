@@ -1,5 +1,5 @@
 """
-    Single agent experiments
+    Multi-swarm experiments
 """
 
 import argparse
