@@ -286,6 +286,18 @@ class GaussianPRM:
                     indices.append(i)
         return indices
     
+    def get_overlapping_index(self, regions):
+        """
+            Get node indices intersecting with the provided polygon. Used to
+            avoid swarm-dynamic obstacle collisions.
+        """
+        indices = []
+        for region in regions:
+            for i, gaussian_node in enumerate(self.gaussian_nodes):
+                if gaussian_node.is_collision(region):
+                    indices.append(i)
+        return indices
+    
     def get_obstacles(self):
         """
             Get obstacles in the space

@@ -1,2 +1,2 @@
-from .max_flow import MaxFlow
-from .teg import TEGSolver
+from .flow_solvers import MaxFlow, MinCostFlow
+from .teg_two_step import TEGSolver

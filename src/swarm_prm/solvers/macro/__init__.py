@@ -15,10 +15,7 @@ def register_solver(name):
 
 # Initialize Solver Registry
 
-from .teg import TEGSolver
-from .teg_mcf import TEGMCFSolver
-from .teg_node_constraint import TEGNodeConstraintSolver
-from .teg_two_step import TEGTwoStepSolver 
+from .teg import TEGSolver 
 from .drrt import DRRTSolver
 from .drrt_star import DRRTStarSolver
 from .lp import LPSolver

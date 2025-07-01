@@ -8,6 +8,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from scipy.linalg import sqrtm
 from scipy.stats import chi2, multivariate_normal
+from shapely.geometry import Polygon
 
 def is_within_ci(point, g_node, chi2_thresh):
     delta = point - g_node.get_mean()
@@ -79,6 +80,34 @@ class GaussianNode:
         return np.random.multivariate_normal(self.mean, 
                                              self.covariance, 
                                              num_samples)
+
+    def get_confidence_ellipse(self, confidence=0.95, num_points=100) -> Polygon:
+        """
+            Get confidence interval ellipse for collision checking
+        """
+        # Chi-squared value for 95% confidence interval in 2D
+        chi2_val = chi2.ppf(confidence, df=2)
+
+        # Eigens
+        eigvals, eigvecs = np.linalg.eigh(self.covariance)
+        axes_lengths = np.sqrt(eigvals * chi2_val)
+
+        # points 
+        theta = np.linspace(0, 2*np.pi, num_points)
+        circle = np.stack([np.cos(theta), np.sin(theta)], axis=1)
+
+        # scale and rotate
+        ellipse = circle @ np.diag(axes_lengths) @ eigvecs.T
+        ellipse += self.mean
+        
+        return Polygon(ellipse)
+
+    def is_collision(self, region, threshold=0.95):
+        """
+            Check collision between confidence ellipse and shapely geometry
+        """
+        gaussian_poly = self.get_confidence_ellipse(threshold)
+        return gaussian_poly.intersects(region)
     
     def visualize(self, ax, threshold=.95, edgecolor="r"):
         """
@@ -100,6 +129,7 @@ class GaussianNode:
         ellipse = Ellipse(xy=self.mean, width=width, height=height, angle=angle, 
                           edgecolor=edgecolor, fc='None', lw=2) 
         ax.add_patch(ellipse)
+        return ellipse
     
     def visualize_gaussian(self, ax, threshold=.95, cmap="Blues"):
         """

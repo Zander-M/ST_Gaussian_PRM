@@ -13,15 +13,20 @@ import pickle
 import shutil
 import time
 
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from shapely.geometry import Polygon
 
 # Solvers 
 from swarm_prm.solvers.macro import SOLVER_REGISTRY
 
 # Scripts
-# from plot_result import plot_result
 
+markers = {
+    "TEGTwoLevelSolver": "*",
+    "LPSolver": "+"
+}
 def run_solver(instance_config):
     """
         Run Experiment
@@ -145,6 +150,46 @@ def create_random_planning_instance(instance_config):
         goals_agent_count.append(count)
     return starts_idx, starts_agent_count, goals_idx, goals_agent_count, num_agents
 
+def plot_results(result_path, show_fig): 
+    """
+        Plot experiment results
+    """
+    # Load CSV
+    df = pd.read_csv(os.path.join(result_path, "results.csv"))
+
+    # Create line plot: Average Runtime vs Capacity Percentage
+    plt.figure(figsize=(10, 6))
+    for (map_type, solver), group in df.groupby(['map_type', 'solver']):
+        group_sorted = group.sort_values('capacity_percentage')
+        plt.plot(group_sorted['capacity_percentage'], group_sorted['average_runtime'],
+                 marker=markers[solver], label=f"{map_type} - {solver}")
+    plt.title("Average Runtime vs Capacity Percentage")
+    plt.xlabel("Capacity Percentage")
+    plt.ylabel("Average Runtime (s)")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if show_fig:
+        plt.show()
+    plt.savefig(os.path.join(result_path, "average_runtime_vs_capacity.png"))
+    plt.close()
+
+    # Create line plot: Success Rate vs Capacity Percentage
+    plt.figure(figsize=(10, 6))
+    for (map_type, solver), group in df.groupby(['map_type', 'solver']):
+        group_sorted = group.sort_values('capacity_percentage')
+        plt.plot(group_sorted['capacity_percentage'], group_sorted['success_rate'],
+                 marker=markers[solver], label=f"{map_type} - {solver}")
+    plt.title("Success Rate vs Capacity Percentage")
+    plt.xlabel("Capacity Percentage")
+    plt.ylabel("Success Rate")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if show_fig:
+        plt.show()
+    plt.savefig(os.path.join(result_path, "success_rate_vs_capacity.png"))
+    plt.close()
 
 def run_experiment(config, result_path):
     """
@@ -202,8 +247,7 @@ def run_experiment(config, result_path):
         writer = csv.DictWriter(f, fieldnames=keys)
         writer.writeheader()
         writer.writerows(results)
-    print(f"Result written to {csv_path}")
-    return csv_path
+    print(f"Result written to {csv_path}") 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gaussian PRM makespan experiment.")
@@ -233,7 +277,7 @@ if __name__ == "__main__":
     result_path = create_result_folder(args.output_dir)
     shutil.copy(args.config, result_path)
     config = load_config(args.config)
-    result_path = run_experiment(config, result_path)
-    # plot_result(result_path, args.show_fig)
+    run_experiment(config, result_path)
+    plot_results(result_path, args.show_fig)
 
     

@@ -8,7 +8,7 @@ import time
 
 from collections import defaultdict, deque
 from swarm_prm.solvers.macro import MacroSolverBase, register_solver
-from swarm_prm.solvers.macro.teg_two_step import MaxFlow, MinCostFlow
+from swarm_prm.solvers.macro.teg import MaxFlow, MinCostFlow
 
 # node labels 
 
@@ -16,11 +16,12 @@ IN_NODE = 0
 OUT_NODE = 1 
 
 @register_solver("TEGTwoStepSolver")
-class TEGTwoStepSolver(MacroSolverBase):
+class TEGSolver(MacroSolverBase):
     def init_solver(self, **kwargs) -> None:
         # Flow constraints
         self.flow_dicts = kwargs.get("flow_dicts", [])
         self.capacity_dicts = kwargs.get("capacity_dicts", [])
+        self.obstacle_goal_states = kwargs.get("obstacle_goal_states", {})
         self.max_timestep = kwargs.get("max_timestep", 0)
 
     def get_min_timestep(self):
@@ -103,8 +104,10 @@ class TEGTwoStepSolver(MacroSolverBase):
 
                 # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
                 teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]  
-                for capacity_dict in self.capacity_dicts:
-                    teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] -= capacity_dict[u, t+1]
+                for capacity_dict in self.capacity_dicts: # Avoid sharing node between swarms
+                    if (u, t+1) in capacity_dict:
+                        teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = 0
+                        break
 
                 # Edge between states
                 for v in self.roadmap[u]:
