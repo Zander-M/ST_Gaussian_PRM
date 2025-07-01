@@ -208,7 +208,6 @@ class GaussianPRM:
     def sample_free_space(self, sampling_strategy="CVT"):
         """
             Sample points on the map uniformly random
-            TODO: add Gaussian Sampling perhaps?
         """
         sampling_method = sampling_methods[sampling_strategy]
         config = sampling_config[sampling_strategy]
@@ -303,41 +302,6 @@ class GaussianPRM:
             Get obstacles in the space
         """
         return self.obstacle_map.get_obstacles()
-
-    def get_solution(self, flow_dict, timestep, num_agent):
-        """
-            Return macro solution path per agent in DFS style
-            TODO: Fix bug here
-        """
-        paths = []
-        copy_dict = copy.deepcopy(flow_dict)
-        for i in range(num_agent):
-            paths.append([])
-            u = ("SS", None) 
-            while u != ("SG", None):
-                for v in copy_dict[u]:
-                    if copy_dict[u][v] > 0:
-                        if v == ("SG", None):
-                            u = v
-                            break
-                        else:
-                            idx = v[0]
-                            paths[-1].append(idx)
-                            copy_dict[u][v] -= 1
-                            u = v
-                            break
-
-            # padding paths to solution length, agent waits at goal
-            wait_timestep = timestep - len(paths[-1])
-            paths[-1] = paths[-1] + [paths[-1][-1]] * wait_timestep
-
-
-        simple_paths = [] # positions
-        gaussian_paths = [] # Gaussian nodes
-        for path in paths:
-            simple_paths.append([self.samples[i] for i in path])
-            gaussian_paths.append([self.gaussian_nodes[i] for i in path])
-        return simple_paths, gaussian_paths
 
 # Visualization functions
 
