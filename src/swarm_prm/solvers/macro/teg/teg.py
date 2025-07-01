@@ -15,7 +15,7 @@ from swarm_prm.solvers.macro.teg import MaxFlow, MinCostFlow
 IN_NODE = 0
 OUT_NODE = 1 
 
-@register_solver("TEGTwoStepSolver")
+@register_solver("TEGSolver")
 class TEGSolver(MacroSolverBase):
     def init_solver(self, **kwargs) -> None:
         # Flow constraints

@@ -54,7 +54,7 @@
 
     "solver_configs": [
         {
-           "solver": "TEGTwoStepSolver",
+           "solver": "TEGSolver",
            "solver_config": {}
         },
         {
