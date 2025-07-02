@@ -10,7 +10,7 @@ from collections import defaultdict, Counter
 
 import matplotlib.pyplot as plt
 
-from swarm_prm.solvers.micro import EvaluationSolver
+from st_gaussian_prm.solvers.micro import EvaluationSolver
 
 def paths_to_macro(paths):
     """

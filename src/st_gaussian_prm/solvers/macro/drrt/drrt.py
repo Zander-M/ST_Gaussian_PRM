@@ -11,7 +11,7 @@ from scipy.optimize import linear_sum_assignment
 import hnswlib # For fast NN check
 import numpy as np
 
-from swarm_prm.solvers.macro import MacroSolverBase, register_solver
+from st_gaussian_prm.solvers.macro import MacroSolverBase, register_solver
 
 @register_solver("DRRTSolver")
 class DRRTSolver(MacroSolverBase):

@@ -7,8 +7,8 @@
 import time
 
 from collections import defaultdict, deque
-from swarm_prm.solvers.macro import MacroSolverBase, register_solver
-from swarm_prm.solvers.macro.teg import MaxFlow, MinCostFlow
+from st_gaussian_prm.solvers.macro import MacroSolverBase, register_solver
+from st_gaussian_prm.solvers.macro.teg import MaxFlow, MinCostFlow
 
 # node labels 
 

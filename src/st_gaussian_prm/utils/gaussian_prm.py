@@ -12,8 +12,8 @@ from scipy.spatial import KDTree, Delaunay
 from scipy.stats.qmc import Halton
 from shapely.geometry import Point, Polygon
 
-from swarm_prm.utils.gaussian_utils import *
-from swarm_prm.utils.cvt import CVT
+from st_gaussian_prm.utils.gaussian_utils import *
+from st_gaussian_prm.utils.cvt import CVT
 
 ### Sampling Methods
 
@@ -163,7 +163,7 @@ class GaussianPRM:
         self.cvar_threshold = cvar_threshold
 
         # SwarmPRM Sampling strategy
-        self.swarm_prm_covariance_scalling= swarm_prm_covariance_scaling
+        self.swarm_prm_covariance_scalling= st_gaussian_prm_covariance_scaling
 
         # CVT Map construction strategy
         self.cvt_iteration = cvt_iteration

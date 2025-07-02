@@ -5,7 +5,7 @@
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 
-from swarm_prm.solvers.utils import GaussianPRM, sample_gaussian
+from st_gaussian_prm.solvers.utils import GaussianPRM, sample_gaussian
 
 class TargetAssignment:
     def __init__(self, start_agent_count, goal_agent_count, gaussian_prm:GaussianPRM):

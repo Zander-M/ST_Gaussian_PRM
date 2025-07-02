@@ -10,7 +10,7 @@ from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 from scipy.stats import chi2
 
-from swarm_prm.utils.gaussian_prm import GaussianPRM
+from st_gaussian_prm.utils.gaussian_prm import GaussianPRM
 
 def is_within_ci(point, g_node, chi2_thresh):
     delta = point - g_node.get_mean()

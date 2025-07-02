@@ -12,8 +12,8 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.envs.obstacle_map import ObstacleMap, Obstacle 
+from st_gaussian_prm.utils.gaussian_prm import GaussianPRM
+from st_gaussian_prm.envs.obstacle_map import ObstacleMap, Obstacle 
 
 MAP_PATH = "../maps"
 

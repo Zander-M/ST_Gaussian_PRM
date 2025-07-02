@@ -12,9 +12,9 @@ import shapely
 from scipy.stats import chi2
 
 
-from swarm_prm.solvers.macro import MacroSolverBase, register_solver
-from swarm_prm.solvers.macro.formation_control import IrisSampler
-from swarm_prm.utils import johns_ellipsoid_edge_constraints, GaussianGraphNode
+from st_gaussian_prm.solvers.macro import MacroSolverBase, register_solver
+from st_gaussian_prm.solvers.macro.formation_control import IrisSampler
+from st_gaussian_prm.utils import johns_ellipsoid_edge_constraints, GaussianGraphNode
 
 class ConvexNode:
     """

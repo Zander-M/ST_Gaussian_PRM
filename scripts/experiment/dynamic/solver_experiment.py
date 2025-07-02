@@ -17,7 +17,7 @@ import numpy as np
 from shapely.geometry import Polygon
 
 # Solvers 
-from swarm_prm.solvers.macro import SOLVER_REGISTRY
+from st_gaussian_prm.solvers.macro import SOLVER_REGISTRY
 
 # Scripts
 # from plot_result import plot_result

@@ -11,7 +11,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points
 import yaml
 
-from swarm_prm.utils import GaussianNode
+from st_gaussian_prm.utils import GaussianNode
 
 ##### Roadmap       #####
 

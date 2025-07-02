@@ -1,9 +1,9 @@
 [project]
-name =  "swarm_prm"
+name =  "st_gaussian_prm"
 authors = [
     {name = "Zander Mao", email = "zma40@sfu.ca"},
 ]
-description = "Swarm PRM with spatio-temporal search"
+description = "Space-Time Gaussian PRM with spatio-temporal search"
 readme = "README.md"
 dependencies = [
     "requests",

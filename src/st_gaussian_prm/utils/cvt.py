@@ -10,7 +10,7 @@ from shapely.affinity import affine_transform
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import orient
 
-from swarm_prm.utils.gaussian_utils import GaussianGraphNode
+from st_gaussian_prm.utils.gaussian_utils import GaussianGraphNode
 
 class CVT:
     """

@@ -7,7 +7,7 @@ import pickle
 from collections import Counter
 
 import numpy as np 
-from swarm_prm.solvers.macro import SOLVER_REGISTRY
+from st_gaussian_prm.solvers.macro import SOLVER_REGISTRY
 
 def load_instance(instance_config, solver_config, **configs):
     """

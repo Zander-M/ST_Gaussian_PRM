@@ -9,9 +9,9 @@ import numpy as np
 import time
 
 
-from swarm_prm.solvers.macro import register_solver, MacroSolverBase
-from swarm_prm.utils.gaussian_prm import GaussianPRM
-from swarm_prm.utils.johnson import johnsons_algorithm
+from st_gaussian_prm.solvers.macro import register_solver, MacroSolverBase
+from st_gaussian_prm.utils.gaussian_prm import GaussianPRM
+from st_gaussian_prm.utils.johnson import johnsons_algorithm
 
 @register_solver("DRRTStarSolver")
 class DRRTStarSolver(MacroSolverBase):

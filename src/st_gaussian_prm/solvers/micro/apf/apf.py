@@ -105,7 +105,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
 
-    from swarm_prm.solvers.micro.apf import APF
+    from st_gaussian_prm.solvers.micro.apf import APF
 
     num_agents = 100
 

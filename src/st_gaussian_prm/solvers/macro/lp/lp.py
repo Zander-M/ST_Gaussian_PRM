@@ -7,7 +7,7 @@ import heapq
 import cvxpy as cp
 import numpy as np
 
-from swarm_prm.solvers.macro import MacroSolverBase, register_solver
+from st_gaussian_prm.solvers.macro import MacroSolverBase, register_solver
 
 @register_solver("LPSolver")
 class LPSolver(MacroSolverBase):
