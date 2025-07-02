@@ -8,10 +8,8 @@ import heapq
 
 import numpy as np
 
-from swarm_prm.utils import GaussianPRM
-
 class MacroSolverBase(ABC):
-    def __init__(self, gaussian_prm:GaussianPRM, agent_radius, 
+    def __init__(self, gaussian_prm, agent_radius, 
                  num_agents, starts_agent_count, goals_agent_count, 
                  starts_idx, goals_idx, 
                  time_limit=100, **kwargs) -> None:
