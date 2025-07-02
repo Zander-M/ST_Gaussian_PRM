@@ -18,16 +18,7 @@ OUT_NODE = 1
 @register_solver("TEGSolver")
 class TEGSolver(MacroSolverBase):
     def init_solver(self, **kwargs) -> None:
-        # Flow constraints
-        self.flow_dicts = kwargs.get("flow_dicts", [])
-        self.max_timestep = kwargs.get("max_timestep", 0)
-
-        # for managing capacity dicts. Swarms should not use nodes used by other swarms
-        self.capacity_dicts = kwargs.get("capacity_dicts", [])
-
-        # for goal state handling. If a dynamic obstacle / another swarm occupies 
-        # certain nodes as goal states, future TEG should not include those nodes.
-        self.obstacle_goal_dicts = kwargs.get("obstacle_goal_dicts", [])
+        pass
 
     def get_min_timestep(self):
         """
@@ -163,7 +154,6 @@ class TEGSolver(MacroSolverBase):
     def update_residual_graph_cost_graph(self, teg, residual_graph, cost_graph, timestep, super_sink):
         """
             Update Residual Graph and Cost Graph for one timestep from previous timestep 
-            TODO: exclude dynamic obstacle edges
         """
         ### TEG
         # update edges to super sink
@@ -224,10 +214,15 @@ class TEGSolver(MacroSolverBase):
             del cost_graph[(goal_idx, timestep-1, OUT_NODE)][super_sink]
             del cost_graph[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
-    def solve(self):
+    def solve(self, **constraint_dicts):
         """
             Find earliest timestep such that the graph reaches target flow
         """
+        self.flow_dicts = constraint_dicts.get("flow_dicts", [])
+        self.obstacle_goal_dicts = constraint_dicts.get("obstacle_goal_dicts", [])
+        self.capacity_dicts = constraint_dicts.get("capacity_dicts", [])
+        self.max_timestep = constraint_dicts.get("max_timestep", 0)
+
 
         # Construct solution that is at least as long as the existing solutions. 
         timestep = max(self.get_min_timestep(), self.max_timestep)
@@ -255,6 +250,7 @@ class TEGSolver(MacroSolverBase):
                                         ).solve()
 
                 capacity_dict = self._flow_to_capacity(flow_dict)
+                goal_state_dict = {goal_idx: timestep for goal_idx in self.goals_idx}
                 paths = self.get_path(flow_dict, timestep)
                 cost = self.get_cost(paths)
                 # TODO: compute suboptimality
@@ -267,7 +263,8 @@ class TEGSolver(MacroSolverBase):
                     "paths": paths,
                     "cost" : cost,
                     "flow_dict": flow_dict, 
-                    "capacity_dict":capacity_dict, 
+                    "capacity_dict": capacity_dict, 
+                    "goal_state_dict": goal_state_dict, 
                     "success": True
                     }
 
