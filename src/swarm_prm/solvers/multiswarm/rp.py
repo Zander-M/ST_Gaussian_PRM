@@ -22,6 +22,12 @@ class RandomPriority:
         start_time = time.time()
         order = np.random.permutation(len(self.instances))
         paths = []
+        constraint_dicts = {
+                "occupancy_sets": [],
+                "obstacle_goal_dicts": [],
+                "flow_dicts": [],
+                "max_timestep": 0
+            }
         while time.time() - start_time < self.time_limit:
             if np.all(solution_found):
                 print(f"solution found, solution time: {time.time() - start_time}.")
@@ -38,19 +44,12 @@ class RandomPriority:
                     "paths": padded_paths
                 }
 
-            constraint_dicts = {
-                "capacity_dicts": [],
-                "obstacle_goal_dicts": [],
-                "flow_dicts": [],
-                "max_timestep": 0
-            }
+
             for idx in order:
                 print(f"Planning for swarm {idx}")
-                import pprint
-                pprint.pprint(constraint_dicts["obstacle_goal_dicts"])
                 solution = self.instances[idx].solve(**constraint_dicts)
                 if solution["success"]:
-                    constraint_dicts["capacity_dicts"].append(solution["capacity_dict"])
+                    constraint_dicts["occupancy_sets"].append(solution["occupancy_set"])
                     constraint_dicts["obstacle_goal_dicts"].append(solution["goal_state_dict"])
                     constraint_dicts["flow_dicts"].append(solution["flow_dict"])
                     constraint_dicts["max_timestep"] = max(constraint_dicts["max_timestep"], solution["timestep"])
@@ -62,6 +61,12 @@ class RandomPriority:
                     solution_found = [False for _ in self.instances]
                     order = np.random.permutation(len(self.instances))
                     paths = []
+                    constraint_dicts = {
+                                    "occupancy_sets": [],
+                                    "obstacle_goal_dicts": [],
+                                    "flow_dicts": [],
+                                    "max_timestep": 0
+                                }
                     break
         print("Timelimit Exceeded.") 
         return {"success": False}

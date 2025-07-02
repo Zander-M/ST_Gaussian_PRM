@@ -98,12 +98,12 @@ class TEGSolver(MacroSolverBase):
         for t in range(timestep):
             for u in self.roadmap:
 
-                # Edge for capacity constraints. We have capacities occupied by previous agents. Capacity Constraint
+                # Edge for capacity constraints. Capacity Constraint
                 teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = self.node_capacity[u]  
 
                 # Avoid sharing node between swarms
-                for capacity_dict in self.capacity_dicts: 
-                    if (u, t+1) in capacity_dict:
+                for occupancy_set in self.occupancy_sets: 
+                    if (u, t+1) in occupancy_set:
                         teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = 0
                         break
 
@@ -193,7 +193,9 @@ class TEGSolver(MacroSolverBase):
                 cost_graph[(v, timestep, OUT_NODE)][(v, timestep, IN_NODE)] = 0
 
         # update goals. Preserve flow from previous residual flow
-        # BE CAREFUL, WE ASSUME GOAL STATES ARE DISJOINT FOR DIFFERNT SWARM
+        # BE CAREFUL, WE ASSUME GOAL STATES ARE DISJOINT FOR DIFFERNT SWARMS. 
+        # OVERLAPPING GOALS MIGHT CAUSE SILENT FAILURES
+
         for i, goal_idx in enumerate(self.goals_idx):
             flow = residual_graph[super_sink][(goal_idx, timestep-1, OUT_NODE)]
 
@@ -220,7 +222,7 @@ class TEGSolver(MacroSolverBase):
         """
         self.flow_dicts = constraint_dicts.get("flow_dicts", [])
         self.obstacle_goal_dicts = constraint_dicts.get("obstacle_goal_dicts", [])
-        self.capacity_dicts = constraint_dicts.get("capacity_dicts", [])
+        self.occupancy_sets = constraint_dicts.get("occupancy_sets", [])
         self.max_timestep = constraint_dicts.get("max_timestep", 0)
 
 
@@ -233,6 +235,7 @@ class TEGSolver(MacroSolverBase):
 
         start_time = time.time()
         while time.time() - start_time < self.time_limit:
+            print("timestep", timestep)
             max_flow, residual_graph = MaxFlow(super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
 
@@ -242,6 +245,7 @@ class TEGSolver(MacroSolverBase):
                 # Reduce solution flow cost
                 ss, sg, teg = self.build_teg(timestep)
                 _, cost_graph = self.build_residual_graph_cost_graph(teg)
+
                 flow_dict = MinCostFlow(teg, 
                                         cost_graph,
                                         ss,
@@ -249,7 +253,8 @@ class TEGSolver(MacroSolverBase):
                                         self.num_agents
                                         ).solve()
 
-                capacity_dict = self._flow_to_capacity(flow_dict)
+                flow_dict = self.clean_zero_flow(flow_dict)
+                occupancy_set = self.flow_to_occupancy(flow_dict)
                 goal_state_dict = {goal_idx: timestep for goal_idx in self.goals_idx}
                 paths = self.get_path(flow_dict, timestep)
                 cost = self.get_cost(paths)
@@ -263,7 +268,7 @@ class TEGSolver(MacroSolverBase):
                     "paths": paths,
                     "cost" : cost,
                     "flow_dict": flow_dict, 
-                    "capacity_dict": capacity_dict, 
+                    "occupancy_set": occupancy_set, 
                     "goal_state_dict": goal_state_dict, 
                     "success": True
                     }
@@ -273,32 +278,27 @@ class TEGSolver(MacroSolverBase):
         print("Timelimit Exceeded.")
         return {"success": False} 
     
-    def _residual_to_flow(self, teg, residual):
+    def clean_zero_flow(self, flow_dict):
         """
-            Construct forward flow graph from residual graph
+            Clean zero flow edges from flow dict
         """
-        flow_dict = defaultdict(dict)
+        cleaned_flow = {}
+        for u, out_edges in flow_dict.items():
+            pruned_edges = {v: f for v, f in out_edges.items() if f > 0}
+            if pruned_edges:
+                cleaned_flow[u] = pruned_edges
+        return cleaned_flow
         
-        for u in teg:
-            # we only look at out-node - in-node edges
-            if u[-1] == OUT_NODE:
-                for v in teg[u]:
-                    flow = residual[v][u]
-                    if flow > 0:
-                            flow_dict[(u[0], u[1])][(v[0], v[1])] = flow
-            
-        return flow_dict
-    
-    def _flow_to_capacity(self, flow_dict):
+    def flow_to_occupancy(self, flow_dict):
         """
-            Construct capacity dict indexed by (node, timestep), representing available flow
+            Occupy every node used in plan
         """
-        capacity_dict = defaultdict(lambda:0)
+        occupancy_set = set()
         for u in flow_dict:
             if u == ("SS", None):
                 continue
             for v, flow in flow_dict[u].items():
                 if v == ("SG", None) or flow == 0:
                     continue
-                capacity_dict[v] += flow 
-        return capacity_dict
+                occupancy_set.add(v) 
+        return occupancy_set
