@@ -103,7 +103,7 @@ class TEGSolver(MacroSolverBase):
 
                 # Avoid sharing node between swarms
                 for capacity_dict in self.capacity_dicts: 
-                    if (u, t+1) in capacity_dict and capacity_dict[(u, t+1)] > 0:
+                    if (u, t+1) in capacity_dict:
                         teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = 0
                         break
 
@@ -297,8 +297,8 @@ class TEGSolver(MacroSolverBase):
         for u in flow_dict:
             if u == ("SS", None):
                 continue
-            for v in flow_dict[u]:
-                if v == ("SG", None):
+            for v, flow in flow_dict[u].items():
+                if v == ("SG", None) or flow == 0:
                     continue
-                capacity_dict[v] += flow_dict[u][v]
+                capacity_dict[v] += flow 
         return capacity_dict
