@@ -109,7 +109,7 @@ class GaussianNode:
         gaussian_poly = self.get_confidence_ellipse(threshold)
         return gaussian_poly.intersects(region)
     
-    def visualize(self, ax, threshold=.95, edgecolor="r"):
+    def visualize(self, ax, threshold=.95, edgecolor="r", linestyle="-"):
         """
             Visualize node on the graph
         """
@@ -127,7 +127,7 @@ class GaussianNode:
         chi2_value = chi2.ppf(threshold, 2)  # 95% confidence interval for 2 degrees of freedom (chi-squared value)
         width, height = 2 * np.sqrt(chi2_value * eigenvalues)
         ellipse = Ellipse(xy=self.mean, width=width, height=height, angle=angle, 
-                          edgecolor=edgecolor, fc='None', lw=2) 
+                          edgecolor=edgecolor, linestyle=linestyle, fc='None', lw=2) 
         ax.add_patch(ellipse)
         return ellipse
     

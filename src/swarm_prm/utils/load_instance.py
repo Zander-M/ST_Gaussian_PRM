@@ -9,7 +9,7 @@ from collections import Counter
 import numpy as np 
 from swarm_prm.solvers.macro import SOLVER_REGISTRY
 
-def load_instance(instance_config, solver_config):
+def load_instance(instance_config, solver_config, **configs):
     """
         Load instance and return a solver object
     """
@@ -65,10 +65,13 @@ def load_instance(instance_config, solver_config):
     for goal_idx, count in goal_counts.items():
         goals_idx.append(goal_idx)
         goals_agent_count.append(count)
+    
+    # load extra config here
+    time_limit = configs.get("time_limit", 5)
 
     solver_cls = SOLVER_REGISTRY[solver_config["solver_name"]]
     return solver_cls(gaussian_prm, instance_config["agent_radius"], 
               starts_agent_count=starts_agent_count, 
               goals_agent_count=goals_agent_count,
               starts_idx=starts_idx, goals_idx=goals_idx,
-              num_agents=num_agents, time_limit=180)
+              num_agents=num_agents, time_limit=time_limit)
