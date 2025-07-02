@@ -103,7 +103,7 @@ class TEGSolver(MacroSolverBase):
 
                 # Avoid sharing node between swarms
                 for capacity_dict in self.capacity_dicts: 
-                    if (u, t+1) in capacity_dict:
+                    if (u, t+1) in capacity_dict and capacity_dict[(u, t+1)] > 0:
                         teg[(u, t+1, IN_NODE)][(u, t+1, OUT_NODE)] = 0
                         break
 
