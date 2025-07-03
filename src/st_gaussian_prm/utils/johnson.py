@@ -35,7 +35,7 @@ def dijkstra(graph, source):
         for v, weight in graph[u]:
             if dist[u] + weight < dist[v]:
                 dist[v] = dist[u] + weight
-                heapq.heappush(pq, (dist[v], v))
+                heapq.heappush(pq, (int(dist[v]), v))
     return dist
 
 def johnsons_algorithm(graph):

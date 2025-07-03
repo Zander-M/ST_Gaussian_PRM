@@ -163,7 +163,7 @@ class GaussianPRM:
         self.cvar_threshold = cvar_threshold
 
         # SwarmPRM Sampling strategy
-        self.swarm_prm_covariance_scalling= st_gaussian_prm_covariance_scaling
+        self.swarm_prm_covariance_scalling= swarm_prm_covariance_scaling 
 
         # CVT Map construction strategy
         self.cvt_iteration = cvt_iteration

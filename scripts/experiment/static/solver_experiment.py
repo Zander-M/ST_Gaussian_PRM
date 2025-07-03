@@ -24,8 +24,8 @@ from st_gaussian_prm.solvers.macro import SOLVER_REGISTRY
 # Scripts
 
 markers = {
-    "TEGTwoLevelSolver": "*",
-    "LPSolver": "+"
+    "TEGSolver": "*",
+    "LPSolver": "o"
 }
 def run_solver(instance_config):
     """
@@ -162,7 +162,7 @@ def plot_results(result_path, show_fig):
     for (map_type, solver), group in df.groupby(['map_type', 'solver']):
         group_sorted = group.sort_values('capacity_percentage')
         plt.plot(group_sorted['capacity_percentage'], group_sorted['average_runtime'],
-                 marker=markers[solver], label=f"{map_type} - {solver}")
+                 marker=markers[solver], markersize=12, label=f"{map_type} - {solver}")
     plt.title("Average Runtime vs Capacity Percentage")
     plt.xlabel("Capacity Percentage")
     plt.ylabel("Average Runtime (s)")
@@ -179,7 +179,7 @@ def plot_results(result_path, show_fig):
     for (map_type, solver), group in df.groupby(['map_type', 'solver']):
         group_sorted = group.sort_values('capacity_percentage')
         plt.plot(group_sorted['capacity_percentage'], group_sorted['success_rate'],
-                 marker=markers[solver], label=f"{map_type} - {solver}")
+                 marker=markers[solver], markersize=12, label=f"{map_type} - {solver}")
     plt.title("Success Rate vs Capacity Percentage")
     plt.xlabel("Capacity Percentage")
     plt.ylabel("Success Rate")

@@ -55,15 +55,15 @@ maps = {
                                 Obstacle(None, "POLYGON", [(145, 25), (125, 50), (135, 100), (150, 100), (160, 75), (150, 25)])
                             ],
                 },
-        "cross":{
-                "obstacle_map" : ObstacleMap(100, 100), 
-                "obstacles" : [
-                                Obstacle(None, "POLYGON", [(0, 0), (30, 00), (30, 30), (0, 30)]),
-                                Obstacle(None, "POLYGON", [(70, 0), (100, 00), (100, 30), (70, 30)]),
-                                Obstacle(None, "POLYGON", [(0, 100), (0, 70), (30, 70), (30, 100)]),
-                                Obstacle(None, "POLYGON", [(70, 70), (100, 70), (100, 100), (70, 100)]),
-                            ], 
-                },
+        # "cross":{
+        #         "obstacle_map" : ObstacleMap(100, 100), 
+        #         "obstacles" : [
+        #                         Obstacle(None, "POLYGON", [(0, 0), (30, 00), (30, 30), (0, 30)]),
+        #                         Obstacle(None, "POLYGON", [(70, 0), (100, 00), (100, 30), (70, 30)]),
+        #                         Obstacle(None, "POLYGON", [(0, 100), (0, 70), (30, 70), (30, 100)]),
+        #                         Obstacle(None, "POLYGON", [(70, 70), (100, 70), (100, 100), (70, 100)]),
+        #                     ], 
+        #         },
         "swarm": {
             "obstacle_map" : ObstacleMap(200, 160),
             "obstacles" : [
@@ -75,10 +75,6 @@ maps = {
                 Obstacle(None, "POLYGON", [(90, 80), (85, 60), (110, 60), (110, 80)]),
             ]
         },
-        "multiagent": {
-            "obstacle_map": ObstacleMap(200, 200),
-            "obstacles": [], 
-        }
         }
 
 if __name__ == "__main__":

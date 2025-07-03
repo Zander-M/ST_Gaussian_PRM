@@ -235,7 +235,6 @@ class TEGSolver(MacroSolverBase):
 
         start_time = time.time()
         while time.time() - start_time < self.time_limit:
-            print("timestep", timestep)
             max_flow, residual_graph = MaxFlow(super_source, super_sink, 
                                     residual_graph=residual_graph, initial_flow=max_flow).solve()
 
