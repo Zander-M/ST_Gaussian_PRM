@@ -28,6 +28,7 @@ class APF:
         self.min_dist = apf_config.get("min_dist", 0.05)
         self.max_step = apf_config.get("max_step", 0.07)
         self.damping = apf_config.get("damping", 0.7)
+        self.max_apf_iterations = apf_config.get("max_apf_iterations", 5000)
 
     def update(self, t, positions):
         """
@@ -35,29 +36,37 @@ class APF:
             attractive force.
             Return APF waypoints.
         """
+        assert t+1 < len(self.gaussian_paths[0]), "Gaussian Trajectory index out of bound"
         goals_gaussians = [self.gaussian_nodes[path[t+1]] for path in self.gaussian_paths]
         goals_mean = np.array([goals_gaussian.mean for goals_gaussian in goals_gaussians])
         goals_cov = np.array([goals_gaussian.covariance for goals_gaussian in goals_gaussians])
         inv_cov = np.linalg.inv(goals_cov)
         trajectories = [] 
         reached_goal = False
+        iter_count = 0
+
+        final_positions = np.copy(positions)
         while not reached_goal:
+            if iter_count > self.max_apf_iterations:
+                raise RuntimeError(f"APF failed to converge: max_iter_num exceeded at timestep {self.max_apf_iterations}") 
             diff = positions - goals_mean
             mahalanobis_sq = np.einsum("ni,nij,nj->n", diff, inv_cov, diff)
             if np.all(mahalanobis_sq < self.goal_chisq_threshold):
                 reached_goal = True
+                final_positions = np.copy(positions)
             else: 
                 forces = self.compute_apf_forces(positions, goals_gaussians)
                 step = self.step_size * forces
-                norm = np.linalg.norm(step)
+                norm = np.linalg.norm(step, axis=1, keepdims=True)
                 scaling = np.minimum(1.0, self.max_step / norm)
                 step = step * scaling
-                # step = np.min(self.max_step * step / norm)
-                trajectories.append(np.copy(positions))
                 positions += self.damping*step
+                trajectories.append(np.copy(positions))
         trajectories = np.stack(trajectories, axis=1)
-        print(trajectories.shape) 
-        return trajectories[:, 1:, :]
+        if trajectories.shape[1] > 1:
+            return trajectories[:, 1:, :], final_positions
+        else:
+            return trajectories, final_positions
 
     def compute_apf_forces(self, pos, gaussian_goals):
         forces = np.zeros_like(pos)
@@ -96,9 +105,9 @@ class APF:
                      for g_node in start_gaussians])
         
         for t in range(len(self.gaussian_paths[0])-1):
-            trajectories = self.update(t, positions)
+            trajectories, final_positions = self.update(t, positions)
+            positions = final_positions 
             segments.append(trajectories)
-            positions = trajectories[:, -1, :]
         return np.concatenate(segments, axis=1)
 
 if __name__ == "__main__":
