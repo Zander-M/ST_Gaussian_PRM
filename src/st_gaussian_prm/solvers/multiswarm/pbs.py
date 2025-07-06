@@ -203,6 +203,7 @@ class PriorityBasedSearch:
             if not conflict_found:
                 # Success!
                 sorted_paths = [node.solutions[i]["paths"] for i in range(num_agents)]
+                agent_count = [len(path) for path in sorted_paths]
 
                 # Compute max path length
                 max_len = max(len(path[0]) for path in sorted_paths)
@@ -215,10 +216,10 @@ class PriorityBasedSearch:
                         padded_paths.append(padded)
                 return {
                     "success": True,
-                    "paths": padded_paths 
+                    "paths": padded_paths,
+                    "agent_count": agent_count
                 }
 
-            print("Conflict Detected!")
             i, j = conflict
 
             for higher, lower in [(i, j), (j, i)]:

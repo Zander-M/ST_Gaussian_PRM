@@ -21,7 +21,7 @@ class RandomPriority:
         solution_found = [False for _ in self.instances]
         start_time = time.time()
         order = np.random.permutation(len(self.instances))
-        paths = []
+        paths = {}
         constraint_dicts = {
                 "occupancy_sets": [],
                 "obstacle_goal_dicts": [],
@@ -30,20 +30,19 @@ class RandomPriority:
             }
         while time.time() - start_time < self.time_limit:
             if np.all(solution_found):
+                agent_count = [self.instances[idx].num_agents for idx in order]
                 print(f"solution found, solution time: {time.time() - start_time}.")
-                solution_length = max([len(path[0]) for path in paths])
+                solution_length = max([len(path) for subpaths in paths.values() for path in subpaths])
                 padded_paths = []
                 for swarm_idx in order:
-                    swarm_paths = paths[swarm_idx]
-                    for path in swarm_paths:
+                    for path in paths[swarm_idx]:
                         padded_path = path + [path[-1]]*(solution_length-len(path))
                         padded_paths.append(padded_path)
-
                 return {
                     "success": True,
-                    "paths": padded_paths
+                    "paths": padded_paths,
+                    "agent_count": agent_count
                 }
-
 
             for idx in order:
                 print(f"Planning for swarm {idx}")
@@ -54,7 +53,7 @@ class RandomPriority:
                     constraint_dicts["flow_dicts"].append(solution["flow_dict"])
                     constraint_dicts["max_timestep"] = max(constraint_dicts["max_timestep"], solution["timestep"])
                     # store solution paths
-                    paths.append(solution["paths"])
+                    paths[idx] = solution["paths"]
                     solution_found[idx] = True
                 else:
                     print("No solution found. Randomizing order.")
