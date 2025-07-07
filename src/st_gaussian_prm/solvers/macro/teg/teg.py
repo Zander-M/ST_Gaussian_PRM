@@ -274,7 +274,6 @@ class TEGSolver(MacroSolverBase):
 
             timestep += 1
             self.update_residual_graph_cost_graph(teg, residual_graph, cost_graph, timestep, super_sink)
-        print("Timelimit Exceeded.")
         return {"success": False} 
     
     def clean_zero_flow(self, flow_dict):
