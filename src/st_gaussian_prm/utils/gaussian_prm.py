@@ -432,7 +432,7 @@ class GaussianPRM:
             # g_node.visualize(ax=ax, edgecolor=cmap(i%10))
             g_node.visualize(ax=ax, edgecolor='gray')
             x, y = g_node.get_mean()
-            ax.text(x, y, str(i), fontsize=8, ha='center', va='center', color='black')
+            # ax.text(x, y, str(i), fontsize=8, ha='center', va='center', color='black')
         
         for obs in self.obstacle_map.obstacles:
             if obs.obs_type == "CIRCLE": 

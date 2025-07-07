@@ -59,7 +59,7 @@ class RandomPriority:
                     print("No solution found. Randomizing order.")
                     solution_found = [False for _ in self.instances]
                     order = np.random.permutation(len(self.instances))
-                    paths = []
+                    paths = {}
                     constraint_dicts = {
                                     "occupancy_sets": [],
                                     "obstacle_goal_dicts": [],

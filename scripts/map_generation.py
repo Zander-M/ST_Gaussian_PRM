@@ -10,7 +10,6 @@ import pickle
 import time
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 from st_gaussian_prm.utils.gaussian_prm import GaussianPRM
 from st_gaussian_prm.envs.obstacle_map import ObstacleMap, Obstacle 
@@ -55,15 +54,13 @@ maps = {
                                 Obstacle(None, "POLYGON", [(145, 25), (125, 50), (135, 100), (150, 100), (160, 75), (150, 25)])
                             ],
                 },
-        # "cross":{
-        #         "obstacle_map" : ObstacleMap(100, 100), 
-        #         "obstacles" : [
-        #                         Obstacle(None, "POLYGON", [(0, 0), (30, 00), (30, 30), (0, 30)]),
-        #                         Obstacle(None, "POLYGON", [(70, 0), (100, 00), (100, 30), (70, 30)]),
-        #                         Obstacle(None, "POLYGON", [(0, 100), (0, 70), (30, 70), (30, 100)]),
-        #                         Obstacle(None, "POLYGON", [(70, 70), (100, 70), (100, 100), (70, 100)]),
-        #                     ], 
-        #         },
+        "multi_swarm":{
+                "obstacle_map" : ObstacleMap(180, 120), 
+                "obstacles" : [
+                                Obstacle(None, "POLYGON", [(0, 0), (60, 0), (60, 60), (0, 60)]),
+                                Obstacle(None, "POLYGON", [(120, 0), (180, 0), (180, 60), (120, 60)]),
+                            ], 
+                },
         "swarm": {
             "obstacle_map" : ObstacleMap(200, 160),
             "obstacles" : [
@@ -82,9 +79,9 @@ if __name__ == "__main__":
     
     parser.add_argument(
         "--map_type",
-        choices=["empty", "corridor", "obstacle", "cross", "corridor_exchange", "corridor_narrow", "swarm"],
+        choices=["empty", "corridor", "obstacle", "swarm", "multi_swarm"],
         nargs="+",
-        default="empty",
+        default=["empty", "corridor", "obstacle", "swarm", "multi_swarm"],
         help="Type of the map to generate."
     )
     
@@ -92,7 +89,7 @@ if __name__ == "__main__":
         "--num_samples",
         nargs="+",
         type=int,
-        default=100, 
+        default=[100, 200], 
         help="Number of samples to use for the map."
     )
 
