@@ -46,7 +46,7 @@ class DRRTSolver(MacroSolverBase):
         self.cost = {self.start_state:0} # cost
         self.tree = {self.start_state: None} # parent
 
-        # Fast NN check
+        # Fast NN check using hnsw
         self.nn = hnswlib.Index(space="l2", dim=self.num_agents*2) # 2D agents
         self.nn.init_index(max_elements=1000000)
         start_location = np.array([[self.nodes[idx] for idx in self.start_state]]).flatten()

@@ -7,8 +7,6 @@ from collections import defaultdict, deque
 import copy
 import time
 
-import numpy as np
-
 class PBSNode:
     """
         PBS Tree nodes
