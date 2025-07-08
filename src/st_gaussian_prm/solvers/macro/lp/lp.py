@@ -134,6 +134,14 @@ class LPSolver(MacroSolverBase):
             for i, count in enumerate(x.value): # type: ignore
                 for _ in range(int(count)):
                     paths.append(shortest_paths[i])
+
+            # pad paths to the same length
+            max_path_length = max([len(path) for path in paths])
+            padded_paths = []
+            for path in paths:
+                padded_path = path + [path[-1]] * (max_path_length - len(path))
+                padded_paths.append(padded_path)
+
             cost = self.get_cost(paths)
 
             return {
@@ -141,8 +149,8 @@ class LPSolver(MacroSolverBase):
                 "g_nodes": self.gaussian_prm.gaussian_nodes,
                 "starts_idx": self.starts_idx,
                 "goals_idx": self.goals_idx,
-                "timestep": max([len(path) for path in paths]),
-                "paths": paths,  
+                "timestep": max_path_length,
+                "paths": padded_paths,  
                 "cost": cost,
                 "prob_value": prob.value
                 }

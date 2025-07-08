@@ -74,6 +74,10 @@ class APF:
             if iter_count > self.max_apf_iterations:
                 raise RuntimeError(f"APF failed to converge: max_iter_num exceeded at timestep {t}") 
 
+        # Ensure trajectories always has at least one frame
+        if len(trajectories) == 0:
+            dummy = np.expand_dims(final_positions, axis=1)
+            return dummy, final_positions
         trajectories = np.stack(trajectories, axis=1)
         if trajectories.shape[1] > 1:
             return trajectories[:, 1:, :], final_positions
