@@ -29,8 +29,8 @@ class DRRTSolver(MacroSolverBase):
         starts_loc = [self.nodes[idx] for idx in self.starts_idx]
         goals_loc = [self.nodes[idx] for idx in self.goals_idx]
         dists = cdist(starts_loc, goals_loc)
-        _, self.goal_state= linear_sum_assignment(dists)
-        self.goal_state = tuple(self.goal_state)
+        row_ind, col_ind = linear_sum_assignment(dists)
+        self.goal_state = tuple(self.goals_idx[j] for j in col_ind)
 
         # initialize agent location
         self.start_state = []
@@ -61,7 +61,15 @@ class DRRTSolver(MacroSolverBase):
         while curr_state is not None:
             path.append(curr_state)
             curr_state = self.tree[curr_state]
-        return path[::-1]
+
+        # Reshape it as path per agent
+        rrt_path = path[::-1]
+        paths = [[] for _ in range(self.num_agents)]
+        for waypoints in rrt_path:
+            for i in range(self.num_agents):
+                paths[i].append(waypoints[i])
+
+        return paths
     
     def expand(self):
         """
@@ -159,11 +167,11 @@ class DRRTSolver(MacroSolverBase):
                     "timestep": len(paths),
                     "cost": self.cost
                 }
-            if iteration % 1000 == 0:
-                print("Iteration:", iteration)
-                print("nearest neighbor time: ", nn_time)
-                print("Od time: ", Od_time)
-                print("Verify time: ", verify_time)
+            # if iteration % 1000 == 0:
+                # print("Iteration:", iteration)
+                # print("nearest neighbor time: ", nn_time)
+                # print("Od time: ", Od_time)
+                # print("Verify time: ", verify_time)
         print("exceeded run time")
         print(self.visited_states)
         return {
