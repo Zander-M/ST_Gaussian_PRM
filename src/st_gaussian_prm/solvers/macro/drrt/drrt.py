@@ -24,12 +24,13 @@ class DRRTSolver(MacroSolverBase):
         """
 
         self.iterations = kwargs.get("iterations", 1) # iterations per goal state check
+        self.goal_sample_rate = kwargs.get("goal_sample_rate", 0.1) # with some probability, sample goal state
 
         # Define goal state
         starts_loc = [self.nodes[idx] for idx in self.starts_idx]
         goals_loc = [self.nodes[idx] for idx in self.goals_idx]
         dists = cdist(starts_loc, goals_loc)
-        row_ind, col_ind = linear_sum_assignment(dists)
+        _, col_ind = linear_sum_assignment(dists)
         self.goal_state = tuple(self.goals_idx[j] for j in col_ind)
 
         # initialize agent location
@@ -79,9 +80,14 @@ class DRRTSolver(MacroSolverBase):
         # accroding to the paper, random state only depends of the dimension of
         # each agents' configuration space.
 
-        xs = np.random.uniform(0, self.obstacle_map.width, self.num_agents)
-        ys = np.random.uniform(0, self.obstacle_map.height, self.num_agents)
-        q_rand = np.column_stack((xs, ys)) 
+        if np.random.rand() < self.goal_sample_rate:
+            goal_indices = list(self.goal_state)
+            q_rand= np.array([self.nodes[idx] for idx in goal_indices])
+        else:
+            xs = np.random.uniform(0, self.obstacle_map.width, self.num_agents)
+            ys = np.random.uniform(0, self.obstacle_map.height, self.num_agents)
+            q_rand = np.column_stack((xs, ys)) 
+
         nn_time = time.time()
         v_near = self.nearest_neighbor(q_rand)
         nn_time = time.time() - nn_time
@@ -198,7 +204,7 @@ class DRRTSolver(MacroSolverBase):
             Verify if two states can be connected
             Return false if agents moving in different directions 
         """
-        return True
+        # return True
         edge = set()
         for i in range(self.num_agents):
             if (node2[i], node1[i]) not in edge:
