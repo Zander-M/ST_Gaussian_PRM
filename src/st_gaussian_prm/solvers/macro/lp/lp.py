@@ -146,10 +146,10 @@ class LPSolver(MacroSolverBase):
 
             return {
                 "success": True,
+                "timestep": max_path_length,
                 "g_nodes": self.gaussian_prm.gaussian_nodes,
                 "starts_idx": self.starts_idx,
                 "goals_idx": self.goals_idx,
-                "timestep": max_path_length,
                 "paths": padded_paths,  
                 "cost": cost,
                 "prob_value": prob.value

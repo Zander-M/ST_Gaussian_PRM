@@ -260,6 +260,7 @@ class TEGSolver(MacroSolverBase):
                 # TODO: compute suboptimality
 
                 return {
+                    "success": True,
                     "timestep": timestep, 
                     "g_nodes": self.gaussian_prm.gaussian_nodes,
                     "starts_idx": self.starts_idx,
@@ -269,7 +270,6 @@ class TEGSolver(MacroSolverBase):
                     "flow_dict": flow_dict, 
                     "occupancy_set": occupancy_set, 
                     "goal_state_dict": goal_state_dict, 
-                    "success": True
                     }
 
             timestep += 1
