@@ -27,50 +27,7 @@ markers = {
     "TEGSolver": "*",
     "LPSolver": "o"
 }
-def run_solver(instance_config):
-    """
-        Run Experiment
-    """
 
-    # Stats
-
-    num_success = 0
-    suboptimality = []
-    runtimes = []
-
-    # Repeat experiments
-    for _ in range(instance_config["num_tries"]):
-    # Random Instance  
-        starts_idx, starts_agent_count, goals_idx, goals_agent_count, num_agents=  \
-        create_random_planning_instance(instance_config)
-
-        # Solver
-        solver_cls = SOLVER_REGISTRY[instance_config["solver"]]
-        solver = solver_cls(
-            instance_config["gaussian_prm"],
-            instance_config["agent_radius"],
-            starts_agent_count = starts_agent_count,
-            goals_agent_count = goals_agent_count,
-            starts_idx = starts_idx,
-            goals_idx = goals_idx,
-            num_agents=num_agents,
-            time_limit=instance_config["time_limit"]
-            )
-        start_time = time.time()
-        solution = solver.solve()
-        runtime = time.time() - start_time
-        if solution["success"]:
-            num_success += 1
-            suboptimality.append(None) # TODO: create suboptimality evaluation here
-            runtimes.append(runtime)
-        else:
-            suboptimality.append(0)
-            runtimes.append(0)
-    return {
-        "success_rate": num_success / instance_config["num_tries"],
-        # "average_suboptimality": np.sum(suboptimality) / num_success,
-        "average_runtime": np.sum(runtimes) / num_success
-    }
 
 def load_config(config_path):
     """
@@ -150,53 +107,77 @@ def create_random_planning_instance(instance_config):
         goals_agent_count.append(count)
     return starts_idx, starts_agent_count, goals_idx, goals_agent_count, num_agents
 
-def plot_results(result_path, show_fig): 
+def plot_results(result_path, show_fig):
     """
-        Plot experiment results
+    Plot per-map experiment results: Runtime and Success Rate vs Capacity Percentage.
+    Saves figures per map.
     """
     # Load CSV
     df = pd.read_csv(os.path.join(result_path, "results.csv"))
 
-    # Create line plot: Average Runtime vs Capacity Percentage
-    plt.figure(figsize=(10, 6))
-    for (map_type, solver), group in df.groupby(['map_type', 'solver']):
-        group_sorted = group.sort_values('capacity_percentage')
-        plt.plot(group_sorted['capacity_percentage'], group_sorted['average_runtime'],
-                 marker=markers[solver], markersize=12, label=f"{map_type} - {solver}")
-    plt.title("Average Runtime vs Capacity Percentage")
-    plt.xlabel("Capacity Percentage")
-    plt.ylabel("Average Runtime (s)")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if show_fig:
-        plt.show()
-    plt.savefig(os.path.join(result_path, "average_runtime_vs_capacity.png"))
-    plt.close()
+    # Ensure results directory exists
+    os.makedirs(result_path, exist_ok=True)
 
-    # Create line plot: Success Rate vs Capacity Percentage
-    plt.figure(figsize=(10, 6))
-    for (map_type, solver), group in df.groupby(['map_type', 'solver']):
-        group_sorted = group.sort_values('capacity_percentage')
-        plt.plot(group_sorted['capacity_percentage'], group_sorted['success_rate'],
-                 marker=markers[solver], markersize=12, label=f"{map_type} - {solver}")
-    plt.title("Success Rate vs Capacity Percentage")
-    plt.xlabel("Capacity Percentage")
-    plt.ylabel("Success Rate")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    if show_fig:
-        plt.show()
-    plt.savefig(os.path.join(result_path, "success_rate_vs_capacity.png"))
-    plt.close()
+    # Plot per map
+    for map_type, map_group in df.groupby('map_type'):
+        # --- Runtime Plot ---
+        plt.figure(figsize=(10, 6))
+        for solver, solver_group in map_group.groupby('solver'):
+            group_sorted = solver_group.sort_values('capacity_percentage')
+            plt.plot(group_sorted['capacity_percentage'], group_sorted['average_runtime'],
+                     marker=markers.get(solver, 'x'), markersize=10, label=solver) # type:ignore
+        plt.title(f"Average Runtime vs Capacity Percentage ({map_type})")
+        plt.xlabel("Capacity Percentage")
+        plt.ylabel("Average Runtime (s)")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        if show_fig:
+            plt.show()
+        plt.savefig(os.path.join(result_path, f"{map_type}_runtime_vs_capacity.png"))
+        plt.close()
+
+        # --- Success Rate Plot ---
+        plt.figure(figsize=(10, 6))
+        for solver, solver_group in map_group.groupby('solver'):
+            group_sorted = solver_group.sort_values('capacity_percentage')
+            plt.plot(group_sorted['capacity_percentage'], group_sorted['success_rate'],
+                     marker=markers.get(solver, 'x'), markersize=10, label=solver) # type:ignore
+        plt.title(f"Success Rate vs Capacity Percentage ({map_type})")
+        plt.xlabel("Capacity Percentage")
+        plt.ylabel("Success Rate")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        if show_fig:
+            plt.show()
+        plt.savefig(os.path.join(result_path, f"{map_type}_success_vs_capacity.png"))
+        plt.close()
+
+        # --- Relative Quality Plot ---
+        # TODO: make sure color matches
+        df_tegsolver = df[(df["map_type"] == map_type) & (df["solver"] == "TEGSolver")]
+
+        plt.figure(figsize=(10, 6))
+        group_sorted = df_tegsolver.sort_values('capacity_percentage')
+        plt.plot(group_sorted['capacity_percentage'], group_sorted['relative_cost'],
+                 marker="o", label="Relative Transport Cost")
+        plt.plot(group_sorted['capacity_percentage'], group_sorted['relative_makespan'],
+                 marker="o", label="Relative Makespan")
+        plt.title(f"Relative Solution Quality vs Capacity Percentage ({map_type})")
+        plt.xlabel("Capacity Percentage")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        if show_fig:
+            plt.show()
+        
+        plt.savefig(os.path.join(result_path, f"{map_type}_relative_solution_quality_vs_capacity.png"))
+        plt.close()
 
 def run_experiment(config, result_path):
     """
-        Compare performance of algorithms on different instances
-        Metric: 
-        Solution Time: time to find a solution
-        Solution Length: average solution length
+        Run experiments using the same random instances with different solvers
     """
     experiment_config = config["experiment_config"]
     env_configs = config["env_configs"]
@@ -205,49 +186,122 @@ def run_experiment(config, result_path):
     combinations = list(itertools.product(
         experiment_config["capacity_percentage"],
         env_configs,
-        solver_configs,
     ))
 
-    # Run experiment
     results = []
-    for capacity_percentage, env_config, solver_config in combinations:
-        instance_config = {
-            "time_limit": experiment_config["time_limit"],
-            "num_tries": experiment_config["num_tries"],
-            "capacity_percentage": capacity_percentage,
-        }
-        instance_config.update(env_config)
-        instance_config.update(solver_config)
 
-        print("Running {}, Capacity Percentage: {}, Map: {}".format(
-            solver_config["solver"],
-            capacity_percentage, 
-            env_config["map_type"],
-            ))
+    for capacity_percentage, env_config in combinations:
         # Load Map
         map_fname = "{}_{}.pkl".format(env_config["map_type"], env_config["num_samples"])
+        map_path = os.path.join("../../../maps", map_fname)
+        with open(map_path, "rb") as f:
+            gaussian_prm = pickle.load(f)
 
-        fname = os.path.join("../../../maps", map_fname)
-        with open(fname, "rb") as f:
-            instance_config["gaussian_prm"] = pickle.load(f) 
-        result = run_solver(instance_config)
+        print(f"Loaded map: {map_fname}")
 
-        # Add experiment config
-        result.update({
-            "solver": solver_config["solver"],
-            "map_type": env_config["map_type"],
-            "capacity_percentage": capacity_percentage,
-        })
-        results.append(result)
-    
-    # Store Experiment Results
-    keys = sorted(results[0].keys())
+        for trial in range(experiment_config["num_tries"]):
+            print(f"Trial {trial+1}/{experiment_config['num_tries']} - Capacity: {capacity_percentage}")
+
+            # Sample a single random instance
+            instance_config_sample = {
+                "gaussian_prm": gaussian_prm,
+                "agent_radius": env_config["agent_radius"],
+                "start_regions": env_config["start_regions"],
+                "goal_regions": env_config["goal_regions"],
+                "num_starts": env_config["num_starts"],
+                "num_goals": env_config["num_goals"],
+                "capacity_percentage": capacity_percentage,
+            }
+
+            starts_idx, starts_agent_count, goals_idx, goals_agent_count, num_agents = \
+                create_random_planning_instance(instance_config_sample)
+
+            swarmprm_result = None
+
+            for solver_config in solver_configs:
+                solver_name = solver_config["solver"]
+                print(f"  Running solver: {solver_name}")
+
+                # Compose instance config
+                instance_config = {
+                    "gaussian_prm": gaussian_prm,
+                    "agent_radius": env_config["agent_radius"],
+                    "time_limit": experiment_config["time_limit"],
+                    "capacity_percentage": capacity_percentage,
+                    "starts_idx": starts_idx,
+                    "starts_agent_count": starts_agent_count,
+                    "goals_idx": goals_idx,
+                    "goals_agent_count": goals_agent_count,
+                    "num_agents": num_agents,
+                    "solver": solver_name,
+                }
+
+                # Run solver
+                solver_cls = SOLVER_REGISTRY[solver_name]
+                solver = solver_cls(
+                    gaussian_prm,
+                    instance_config["agent_radius"],
+                    starts_agent_count=starts_agent_count,
+                    goals_agent_count=goals_agent_count,
+                    starts_idx=starts_idx,
+                    goals_idx=goals_idx,
+                    num_agents=num_agents,
+                    time_limit=instance_config["time_limit"],
+                    **solver_config["solver_config"]
+                )
+
+                start_time = time.time()
+                solution = solver.solve()
+                runtime = time.time() - start_time
+
+                cost = solution.get("cost", 0)
+                timestep = solution.get("timestep", 0)
+
+                if solver_name == "LPSolver" and solution["success"]:
+                    swarmprm_result = {
+                        "cost": cost,
+                        "timestep": timestep
+                    }
+
+                relative_cost = cost / swarmprm_result["cost"] if (solution["success"] and swarmprm_result) else None
+                relative_makespan = timestep / swarmprm_result["timestep"] if (solution["success"] and swarmprm_result and swarmprm_result["timestep"] > 0) else None
+
+                result = {
+                    "solver": solver_name,
+                    "map_type": env_config["map_type"],
+                    "capacity_percentage": capacity_percentage,
+                    "trial": trial,
+                    "success": solution["success"],
+                    "valid": solution["valid"],
+                    "runtime": runtime if solution["success"] else 0,
+                    "cost": cost,
+                    "timestep": timestep,
+                    "relative_cost": relative_cost,
+                    "relative_makespan": relative_makespan,
+                }
+                results.append(result)
+
+    # Save raw results
+    df = pd.DataFrame(results)
+    df.to_csv(os.path.join(result_path, "raw_results.csv"), index=False)
+
+    # Aggregate summary
+    df_summary = df.groupby(["solver", "map_type", "capacity_percentage"]).agg({
+        "valid": "mean",
+        "runtime": lambda x: np.mean([v for v in x if v > 0]) if any(x) else 0,
+        "relative_cost": lambda x: np.nanmean(x),
+        "relative_makespan": lambda x: np.nanmean(x),
+    }).reset_index()
+
+    df_summary.rename(columns={
+        "valid": "success_rate",
+        "runtime": "average_runtime"
+    }, inplace=True)
+
     csv_path = os.path.join(result_path, "results.csv")
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=keys)
-        writer.writeheader()
-        writer.writerows(results)
-    print(f"Result written to {csv_path}") 
+    df_summary.to_csv(csv_path, index=False)
+    print(f"Results saved to {csv_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gaussian PRM makespan experiment.")
@@ -274,10 +328,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ## Copy config file to result folder
-    result_path = create_result_folder(args.output_dir)
-    shutil.copy(args.config, result_path)
-    config = load_config(args.config)
-    run_experiment(config, result_path)
+    # result_path = create_result_folder(args.output_dir)
+    # shutil.copy(args.config, result_path)
+    # config = load_config(args.config)
+    # run_experiment(config, result_path)
+    result_path = "results/20250717_102710"
     plot_results(result_path, args.show_fig)
-
-    
