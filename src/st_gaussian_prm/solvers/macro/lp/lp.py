@@ -144,6 +144,12 @@ class LPSolver(MacroSolverBase):
 
             cost = self.get_cost(paths)
 
+            # Evaluate Capacity
+            num_violations, _ = self.eval_capacity(padded_paths)
+            valid = True
+            if num_violations > 0:
+                valid = False# Invalid solution due to violating capacity constraint
+
             return {
                 "success": True,
                 "timestep": max_path_length,
@@ -152,9 +158,13 @@ class LPSolver(MacroSolverBase):
                 "goals_idx": self.goals_idx,
                 "paths": padded_paths,  
                 "cost": cost,
+                "valid": valid,
                 "prob_value": prob.value
                 }
 
         else:
+            print("Capacity Constraint", self.capacity_constraint)
+            print("Status:", prob.status)
+            print("Solver output:", prob.value)
             print("No feasible solution found.")
             return {"success": False}

@@ -257,7 +257,12 @@ class TEGSolver(MacroSolverBase):
                 goal_state_dict = {goal_idx: timestep for goal_idx in self.goals_idx}
                 paths = self.get_path(flow_dict, timestep)
                 cost = self.get_cost(paths)
-                # TODO: compute suboptimality
+
+                # Evaluate Capacity
+                num_violations, _ = self.eval_capacity(paths)
+                valid = True 
+                if num_violations > 0:
+                    valid = False 
 
                 return {
                     "success": True,
@@ -267,6 +272,7 @@ class TEGSolver(MacroSolverBase):
                     "goals_idx": self.goals_idx,
                     "paths": paths,
                     "cost" : cost,
+                    "valid": valid,
                     "flow_dict": flow_dict, 
                     "occupancy_set": occupancy_set, 
                     "goal_state_dict": goal_state_dict, 
