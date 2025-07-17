@@ -1,7 +1,7 @@
 {
     "experiment_config": {
             "time_limit": 180,
-            "num_tries": 10,
+            "num_tries": 100,
             "capacity_percentage": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
     },
     "env_configs": [
@@ -54,14 +54,14 @@
 
     "solver_configs": [
         {
-           "solver": "TEGSolver",
-           "solver_config": {}
-        },
-        {
            "solver": "LPSolver",
            "solver_config": {
-            "capacity_constraint": false
+           "capacity_constraint": false
            }
+        },
+        {
+           "solver": "TEGSolver",
+           "solver_config": {}
         }
     ]
 }
