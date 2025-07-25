@@ -112,6 +112,17 @@ def plot_results(result_path, show_fig):
     Plot per-map experiment results: Runtime and Success Rate vs Capacity Percentage.
     Saves figures per map.
     """
+    # Set up params for LaTeX
+    plt.rcParams.update({
+        "font.size": 36,           # Base font size
+        "axes.titlesize": 42,      # Title size
+        "axes.labelsize": 36,      # Axis labels
+        "xtick.labelsize": 30,
+        "ytick.labelsize": 30,
+        "legend.fontsize": 30,
+        "figure.titlesize": 42
+    })
+
     # Load CSV
     df = pd.read_csv(os.path.join(result_path, "results.csv"))
 
@@ -121,50 +132,50 @@ def plot_results(result_path, show_fig):
     # Plot per map
     for map_type, map_group in df.groupby('map_type'):
         # --- Runtime Plot ---
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(15, 12))
         for solver, solver_group in map_group.groupby('solver'):
             group_sorted = solver_group.sort_values('capacity_percentage')
             plt.plot(group_sorted['capacity_percentage'], group_sorted['average_runtime'],
                      marker=markers.get(solver, 'x'), markersize=10, label=solver) # type:ignore
-        plt.title(f"Average Runtime vs Capacity Percentage ({map_type})")
+        # plt.title(f"Average Runtime vs Capacity Percentage ({map_type})")
         plt.xlabel("Capacity Percentage")
-        plt.ylabel("Average Runtime (s)")
+        # plt.ylabel("Average Runtime (s)")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
         if show_fig:
             plt.show()
-        plt.savefig(os.path.join(result_path, f"{map_type}_runtime_vs_capacity.png"))
+        plt.savefig(os.path.join(result_path, f"{map_type}_runtime_vs_capacity.pdf"), bbox_inches="tight")
         plt.close()
 
         # --- Success Rate Plot ---
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(15, 12))
         for solver, solver_group in map_group.groupby('solver'):
             group_sorted = solver_group.sort_values('capacity_percentage')
             plt.plot(group_sorted['capacity_percentage'], group_sorted['success_rate'],
                      marker=markers.get(solver, 'x'), markersize=10, label=solver) # type:ignore
-        plt.title(f"Success Rate vs Capacity Percentage ({map_type})")
+        # plt.title(f"Success Rate vs Capacity Percentage ({map_type})")
         plt.xlabel("Capacity Percentage")
-        plt.ylabel("Success Rate")
+        # plt.ylabel("Success Rate")
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
         if show_fig:
             plt.show()
-        plt.savefig(os.path.join(result_path, f"{map_type}_success_vs_capacity.png"))
+        plt.savefig(os.path.join(result_path, f"{map_type}_success_vs_capacity.pdf"), bbox_inches="tight")
         plt.close()
 
         # --- Relative Quality Plot ---
         # TODO: make sure color matches
         df_tegsolver = df[(df["map_type"] == map_type) & (df["solver"] == "TEGSolver")]
 
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(15, 12))
         group_sorted = df_tegsolver.sort_values('capacity_percentage')
         plt.plot(group_sorted['capacity_percentage'], group_sorted['relative_cost'],
                  marker="o", label="Relative Transport Cost")
         plt.plot(group_sorted['capacity_percentage'], group_sorted['relative_makespan'],
                  marker="o", label="Relative Makespan")
-        plt.title(f"Relative Solution Quality vs Capacity Percentage ({map_type})")
+        # plt.title(f"Relative Solution Quality vs Capacity Percentage ({map_type})")
         plt.xlabel("Capacity Percentage")
         plt.legend()
         plt.grid(True)
@@ -172,7 +183,7 @@ def plot_results(result_path, show_fig):
         if show_fig:
             plt.show()
         
-        plt.savefig(os.path.join(result_path, f"{map_type}_relative_solution_quality_vs_capacity.png"))
+        plt.savefig(os.path.join(result_path, f"{map_type}_relative_solution_quality_vs_capacity.pdf"), bbox_inches="tight")
         plt.close()
 
 def run_experiment(config, result_path):
@@ -328,9 +339,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     ## Copy config file to result folder
-    # result_path = create_result_folder(args.output_dir)
-    # shutil.copy(args.config, result_path)
-    # config = load_config(args.config)
-    # run_experiment(config, result_path)
-    result_path = "results/20250717_102710"
+    result_path = create_result_folder(args.output_dir)
+    shutil.copy(args.config, result_path)
+    config = load_config(args.config)
+    run_experiment(config, result_path)
     plot_results(result_path, args.show_fig)
