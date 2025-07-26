@@ -38,7 +38,8 @@ class MacroSolverBase(ABC):
         for i, goal in enumerate(self.goals_idx):
             assert self.node_capacity[goal] >= self.goals_agent_count[i], \
                 "Goal capacity smaller than required."
-        self.init_solver(**kwargs)
+        solver_config = kwargs.get("solver_config", {})
+        self.init_solver(**solver_config)
     
     def build_roadmap_with_cost(self):
         """

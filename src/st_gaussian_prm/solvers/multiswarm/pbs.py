@@ -221,6 +221,8 @@ class PriorityBasedSearch:
             i, j = conflict
 
             for higher, lower in [(i, j), (j, i)]:
+                # TODO: decide order first based on cost
+
                 child = node.copy()
                 child.add_priority(higher, lower)
 

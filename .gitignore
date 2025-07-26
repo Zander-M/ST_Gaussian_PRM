@@ -136,6 +136,6 @@ test_*
 /notebooks/*.gif
 /notebooks/solutions/*
 
-# vscode
+# vscode & mac
 /.vscode/
-/.DS_Store
+.DS_Store

@@ -420,7 +420,7 @@ class GaussianPRM:
         ax.set_ylim(bottom=0, top=self.obstacle_map.height)
         return fig, ax
     
-    def visualize_g_nodes(self):
+    def visualize_g_nodes(self, **kwargs):
         """
             Visualize Gaussian Nodes on the map
         """
@@ -430,7 +430,8 @@ class GaussianPRM:
         cmap = plt.get_cmap('tab10')
         for i, g_node in enumerate(self.gaussian_nodes):
             # g_node.visualize(ax=ax, edgecolor=cmap(i%10))
-            g_node.visualize(ax=ax, edgecolor='gray')
+            edgecolor = kwargs.get("edgecolor", 'gray')
+            g_node.visualize(ax=ax, edgecolor=edgecolor)
             x, y = g_node.get_mean()
             # ax.text(x, y, str(i), fontsize=8, ha='center', va='center', color='black')
         
