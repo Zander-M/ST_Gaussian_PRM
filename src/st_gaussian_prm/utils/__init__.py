@@ -5,3 +5,4 @@ from .evaluation import *
 from .gaussian_utils import *
 from .gaussian_prm import *
 from .load_instance import load_instance
+from .load_config import load_config 

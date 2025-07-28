@@ -11,11 +11,11 @@ from st_gaussian_prm.solvers.macro import MacroSolverBase, register_solver
 
 @register_solver("LPSolver")
 class LPSolver(MacroSolverBase):
-    def init_solver(self, **kwargs):
+    def init_solver(self, **experiment_config):
         """
             Solver Init
         """
-        self.capacity_constraint = kwargs.get("capacity_constraint", True)
+        self.capacity_constraint = experiment_config.get("capacity_constraint", True)
 
     def get_shortest_paths(self):
         """

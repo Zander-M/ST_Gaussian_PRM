@@ -1,0 +1,36 @@
+### Config Experiment 
+
+experiment:
+  instance_name: "swarm"
+  solver_name: "TEGSolver"
+  time_limit: 180
+  capacity_constraint: true
+
+## End of Config Experiment
+
+instances:
+  swarm:
+    capacity_percentage: 0.3
+    agent_radius: 1
+    map_type: "swarm"
+    num_samples: 100
+    start_regions:
+      - [[0, 40], [0, 0], [50, 0], [50, 40]]
+      - [[0, 160], [0, 120], [50, 120], [50, 160]]
+    goal_regions:
+      - [[160, 160], [160, 110], [200, 110], [200, 160]]
+      - [[160, 40], [160, 0], [200, 0], [200, 40]]
+    num_starts: 12
+    num_goals: 12
+
+apf_config:
+  k_attr: 0.05
+  k_rep: 100
+  step_size: 0.5
+  repulsion_radius: 2.5
+  goal_chisq_threshold: 5.991
+  max_rep_force: 10.0
+  min_dist: 0.5
+  max_step: 0.7
+  damping: 0.7
+  max_apf_interations: 10000

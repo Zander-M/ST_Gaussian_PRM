@@ -7,9 +7,9 @@ import pickle
 from collections import Counter
 
 import numpy as np 
-from st_gaussian_prm.solvers.macro import SOLVER_REGISTRY
+import st_gaussian_prm.solvers.macro as macro
 
-def load_instance(instance_config, solver_config, **configs):
+def load_instance(instance_config, solver_config, **experiment_config):
     """
         Load instance and return a solver object
     """
@@ -67,11 +67,10 @@ def load_instance(instance_config, solver_config, **configs):
         goals_agent_count.append(count)
     
     # load extra config here
-    time_limit = configs.get("time_limit", 5)
-
-    solver_cls = SOLVER_REGISTRY[solver_config["solver_name"]]
+    solver_cls = macro.get_solver_class(solver_config["solver_name"])
     return solver_cls(gaussian_prm, instance_config["agent_radius"], 
+              num_agents=num_agents,
               starts_agent_count=starts_agent_count, 
               goals_agent_count=goals_agent_count,
               starts_idx=starts_idx, goals_idx=goals_idx,
-              num_agents=num_agents, time_limit=time_limit)
+              **experiment_config)

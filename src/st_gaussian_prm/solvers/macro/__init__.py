@@ -5,6 +5,8 @@
 
 from .macro_solver_base import MacroSolverBase
 
+# Initialize Solver Registry
+
 SOLVER_REGISTRY = {}
 
 def register_solver(name):
@@ -13,10 +15,16 @@ def register_solver(name):
         return cls
     return decorator
 
-# Initialize Solver Registry
-
 from .teg import TEGSolver 
 from .drrt import DRRTSolver
 from .drrt_star import DRRTStarSolver
 from .lp import LPSolver
 from .formation_control import FormationControlSovler
+
+# Get solvers
+
+def get_solver_class(name):
+    try:
+        return SOLVER_REGISTRY[name]
+    except KeyError:
+        raise ValueError(f"Solver {name} not found. Available: {list(SOLVER_REGISTRY)}")

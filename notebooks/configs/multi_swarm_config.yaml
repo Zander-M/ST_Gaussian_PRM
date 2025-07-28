@@ -1,0 +1,59 @@
+experiment:
+  instance_name: "corridor"
+  solver_name: "TEGSolver"
+  time_limit: 180
+  capacity_constraint: true
+
+instances:
+  swarm:
+    capacity_percentage: 0.5
+    agent_radius: 1
+    map_type: "swarm"
+    num_samples: 100
+    start_regions:
+      - [[0, 40], [0, 0], [50, 0], [50, 40]]
+      - [[0, 160], [0, 120], [50, 120], [50, 160]]
+    goal_regions:
+      - [[160, 160], [160, 110], [200, 110], [200, 160]]
+      - [[160, 40], [160, 0], [200, 0], [200, 40]]
+    num_starts: 12
+    num_goals: 12
+
+  obstacle:
+    capacity_percentage: 0.8
+    agent_radius: 1
+    map_type: "obstacle"
+    num_samples: 100
+    start_regions:
+      - [[0, 40], [0, 0], [50, 0], [50, 40]]
+      - [[0, 160], [0, 120], [50, 120], [50, 160]]
+    goal_regions:
+      - [[170, 160], [170, 110], [200, 110], [200, 160]]
+      - [[170, 40], [170, 0], [200, 0], [200, 40]]
+    num_starts: 10
+    num_goals: 10
+
+  corridor:
+    capacity_percentage: 0.8
+    agent_radius: 1
+    map_type: "corridor"
+    num_samples: 100
+    start_regions:
+      - [[0, 30], [0, 0], [30, 0], [30, 30]]
+      - [[0, 100], [0, 70], [30, 70], [30, 100]]
+    goal_regions:
+      - [[70, 0], [100, 0], [100, 30], [70, 30]]
+      - [[70, 70], [100, 70], [100, 100], [70, 100]]
+    num_starts: 4
+    num_goals: 4
+
+apf_config:
+  k_attr: 0.05
+  k_rep: 100
+  step_size: 0.5
+  repulsion_radius: 2.5
+  goal_chisq_threshold: 5.991
+  max_rep_force: 10.0
+  min_dist: 0.5
+  max_step: 0.7
+  damping: 0.7
