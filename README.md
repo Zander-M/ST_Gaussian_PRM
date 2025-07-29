@@ -10,25 +10,20 @@ This planner supports planning with predefined dynamic obstacles and multi-swarm
 
 <img src="./media/static_solution.png" alt="Static Solution" width="640">
 
-<video width ="640" height="360" controls>
-    <source src="./media/static_experiment.mp4" type="video/mp4">
-</video>
+<img src="./media/static_experiment.gif" alt="Static Solution" width="640">
 
 ## Dynamic Experiment
 
 <img src="./media/dynamic_solution.png" alt="Static Solution" width="640">
 
-<video width ="640" height="360" controls>
-    <source src="./media/dynamic_experiment.mp4" type="video/mp4">
-</video>
+<img src="./media/dynamic_experiment.gif" alt="Static Solution" width="640">
 
 ## Multi-Swarm Experiment
 
 <img src="./media/multi_swarm_solution.png" alt="Multi-Swarm Solution" width="640">
 
-<video width ="640" height="360" controls>
-    <source src="./media/multi_swarm_experiment.mp4" type="video/mp4">
-</video>
+<img src="./media/multi_swarm_experiment.gif" alt="Multi-Swarm Solution" width="640">
+
 
 ## Installation
 
