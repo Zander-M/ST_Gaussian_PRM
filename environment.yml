@@ -227,6 +227,5 @@ dependencies:
       - scipy==1.15.2
       - scs==3.2.7.post2
       - shapely==2.0.7
-      - st-gaussian-prm==0.0.0
       - tzdata==2025.1
 prefix: /opt/anaconda3/envs/ST_Gaussian_PRM
