@@ -7,7 +7,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial.distance import cdist
-
+from scipy.optimize import linear_sum_assignment
 
 class APF:
     """
@@ -30,13 +30,13 @@ class APF:
         self.damping = apf_config.get("damping", 0.7)
         self.max_apf_iterations = apf_config.get("max_apf_iterations", 5000)
     
-    def update(self, t, positions, fixed_num_steps=1000):
+    def dynamic_assign_goals(self, positions, t):
         """
-            Update trajectories for one uniform timestep using soft Gaussian
-            attractive force.
-            Return APF waypoints.
+            Dynamically assign goal nodes for next timestep.
         """
+        # Grab goals for next timestep
         path_len = len(self.gaussian_paths[0])
+        goals_gaussians = []
         pad_path = False
         if t+1 < path_len:
             goals_gaussians = [self.gaussian_nodes[path[t+1]] for path in self.gaussian_paths]
@@ -44,6 +44,27 @@ class APF:
             # Extra padding step
             goals_gaussians = [self.gaussian_nodes[path[t]] for path in self.gaussian_paths]
             pad_path = True
+
+        # Assign goals
+        dist_matrix = np.zeros((len(positions), len(goals_gaussians)))
+        for i, pos in enumerate(positions):
+            for j, g_node in enumerate(goals_gaussians):
+                diff = pos - g_node.mean
+                inv_cov = np.linalg.inv(g_node.covariance)
+                dist_matrix[i, j] = diff.T @ inv_cov @ diff  # Mahalanobis^2
+
+        row_ind, col_ind = linear_sum_assignment(dist_matrix)
+
+        assigned_gaussians = [goals_gaussians[i] for i in row_ind]
+
+        return assigned_gaussians, pad_path
+
+    def update(self, positions, goals_gaussians, pad_path, t, fixed_num_steps=1000):
+        """
+            Update trajectories for one uniform timestep using soft Gaussian
+            attractive force.
+            Return APF waypoints.
+        """
         goals_mean = np.array([goals_gaussian.mean for goals_gaussian in goals_gaussians])
         goals_cov = np.array([goals_gaussian.covariance for goals_gaussian in goals_gaussians])
         inv_cov = np.linalg.inv(goals_cov)
@@ -121,7 +142,8 @@ class APF:
                      for g_node in start_gaussians])
         
         for t in range(len(self.gaussian_paths[0])):
-            trajectories, final_positions = self.update(t, positions)
+            goals_gaussians, pad_path = self.dynamic_assign_goals(positions, t)
+            trajectories, final_positions = self.update(positions, goals_gaussians, pad_path, t)
             positions = final_positions 
             segments.append(trajectories)
 
